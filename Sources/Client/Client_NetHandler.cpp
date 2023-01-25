@@ -66,6 +66,8 @@ namespace spades {
 			followCameraState.enabled = false;
 			freeCameraState.position = MakeVector3(256, 256, 30);
 			freeCameraState.velocity = MakeVector3(0, 0, 0);
+
+			followedPlayerId = world->GetLocalPlayerIndex();
 		}
 
 		void Client::PlayerCreatedBlock(spades::client::Player *p) {
@@ -243,6 +245,11 @@ namespace spades {
 					followCameraState.enabled = false;
 				}
 			}
+
+			if (p->GetId() == followedPlayerId) {
+					followedPlayerId = world->GetLocalPlayerIndex();
+			}
+
 
 			{
 				std::string msg;

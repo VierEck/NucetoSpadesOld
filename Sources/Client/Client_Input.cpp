@@ -379,11 +379,14 @@ namespace spades {
 							}
 							return;
 						} else if (CheckKey(cg_keyReloadWeapon, name) &&
-						           world->GetLocalPlayer()->IsSpectator() &&
-						           followCameraState.enabled) {
+						           world->GetLocalPlayer()->IsSpectator()) {
 							if (down) {
+								if (!followCameraState.enabled && followedPlayerId == world->GetLocalPlayerIndex()) { 
+									FollowNextPlayer(false);
+									return;
+								}
 								// Unfollow
-								followCameraState.enabled = false;
+								followCameraState.enabled = !followCameraState.enabled;
 							}
 							return;
 						}
