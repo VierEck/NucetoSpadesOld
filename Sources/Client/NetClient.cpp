@@ -506,7 +506,14 @@ namespace spades {
 
 				if (event.type == ENET_EVENT_TYPE_RECEIVE) {
 					if (cg_DemoRecord && DemoStarted) {
-						RegisterDemoPacket(event.packet);
+						if (event.packet->data[0] != 15) {
+							RegisterDemoPacket(event.packet);
+						} else {
+							int player_id = event.packet->data[1];
+							event.packet->data[1] = 33;
+							RegisterDemoPacket(event.packet);
+							event.packet->data[1] = player_id;
+						}
 					} else if (DemoStarted) {
 						DemoStopRecord(); //stop if disable midgame. but cant enable midgame again
 					}
@@ -1868,9 +1875,6 @@ namespace spades {
 		static const struct Demo ResetStruct;
 	
 		FILE* NetClient::CreateDemoFile(std::string file_name) {
-			time_t current_time = time(NULL);
-			char* str_time = ctime(&current_time);
-		
 			FILE* file;
 			file = fopen(file_name.c_str(), "wb");
 
@@ -1888,7 +1892,7 @@ namespace spades {
 			if (!CurrentDemo.fp)
 				return;
 			
-			float c_time = time(NULL) - CurrentDemo.start_time;
+			float c_time = client->time - CurrentDemo.start_time;
 			unsigned short len = packet->dataLength;
 			
 			fwrite(&c_time, sizeof(c_time), 1, CurrentDemo.fp);
@@ -1898,7 +1902,7 @@ namespace spades {
 
 		void NetClient::DemoStartRecord(std::string file_name) {
 			CurrentDemo.fp = CreateDemoFile(file_name);
-			CurrentDemo.start_time = time(NULL);
+			CurrentDemo.start_time = client->time;
 			DemoStarted = true;
 		}
 

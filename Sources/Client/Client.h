@@ -115,7 +115,7 @@ namespace spades {
 			std::unique_ptr<GameMapWrapper> mapWrapper;
 			Handle<IRenderer> renderer;
 			Handle<IAudioDevice> audioDevice;
-			float time;
+			//float time;
 			bool readyToClose;
 			float worldSubFrame;
 
@@ -490,6 +490,8 @@ namespace spades {
 			
 			void PlayerCoords();
 			bool hitTestSizeToggle;
+
+			float time;
 		};
 	}
 }
