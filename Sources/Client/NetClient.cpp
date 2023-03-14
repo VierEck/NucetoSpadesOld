@@ -393,6 +393,7 @@ namespace spades {
 				enet_host_destroy(host);
 			bandwidthMonitor.reset();
 			SPLog("ENet host destroyed");
+			DemoStopRecord();
 		}
 
 		void NetClient::Connect(const ServerAddress &hostname) {
@@ -462,10 +463,6 @@ namespace spades {
 			enet_peer_reset(peer);
 			// FXIME: release peer
 			peer = NULL;
-
-			if (cg_DemoRecord) {
-				DemoStopRecord();
-			}
 		}
 
 		int NetClient::GetPing() {
@@ -503,10 +500,6 @@ namespace spades {
 					SPLog("Disconnected (data = 0x%08x)", (unsigned int)event.data);
 					statusString = "Disconnected: " + DisconnectReasonString(event.data);
 					SPRaise("Disconnected: %s", DisconnectReasonString(event.data).c_str());
-
-					if (cg_DemoRecord) {
-						DemoStopRecord();
-					}
 				}
 
 				stmp::optional<NetPacketReader> readerOrNone;
@@ -1874,16 +1867,12 @@ namespace spades {
 		struct Demo CurrentDemo;
 		static const struct Demo ResetStruct;
 	
-		FILE* NetClient::CreateDemoFile(std::string demo) {
+		FILE* NetClient::CreateDemoFile(std::string file_name) {
 			time_t current_time = time(NULL);
 			char* str_time = ctime(&current_time);
-
-			std::string test = "Demos/test.demo";
-			demo = "UserResources/" + test;
-			//demo = "UserResources/" + demo;
 		
 			FILE* file;
-			file = fopen(demo.c_str(), "wb");
+			file = fopen(file_name.c_str(), "wb");
 
 			// aos_replay version + 0.75 version
 			unsigned char value = 1;
@@ -1905,8 +1894,6 @@ namespace spades {
 			fwrite(&c_time, sizeof(c_time), 1, CurrentDemo.fp);
 			fwrite(&len, sizeof(len), 1, CurrentDemo.fp);
 			fwrite(packet->data, packet->dataLength, 1, CurrentDemo.fp);
-
-			SPLog("register success");
 		}
 
 		void NetClient::DemoStartRecord(std::string file_name) {
@@ -1916,10 +1903,11 @@ namespace spades {
 		}
 
 		void NetClient::DemoStopRecord() {
-			fclose(CurrentDemo.fp);
+			DemoStarted = false;
+			if (CurrentDemo.fp)
+				fclose(CurrentDemo.fp);
 		
 			CurrentDemo = ResetStruct;
-			DemoStarted = false;
 		}
 	}
 }
