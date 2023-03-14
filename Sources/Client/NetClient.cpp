@@ -45,7 +45,11 @@
 #include <Core/Strings.h>
 #include <Core/TMPUtils.h>
 
+#include <Core/DirectoryFileSystem.h>
+#include <stdio.h>
+
 DEFINE_SPADES_SETTING(cg_unicode, "1");
+DEFINE_SPADES_SETTING(cg_DemoRecord, "1");
 
 namespace spades {
 	namespace client {
@@ -458,6 +462,10 @@ namespace spades {
 			enet_peer_reset(peer);
 			// FXIME: release peer
 			peer = NULL;
+
+			if (cg_DemoRecord) {
+				DemoStopRecord();
+			}
 		}
 
 		int NetClient::GetPing() {
@@ -495,11 +503,21 @@ namespace spades {
 					SPLog("Disconnected (data = 0x%08x)", (unsigned int)event.data);
 					statusString = "Disconnected: " + DisconnectReasonString(event.data);
 					SPRaise("Disconnected: %s", DisconnectReasonString(event.data).c_str());
+
+					if (cg_DemoRecord) {
+						DemoStopRecord();
+					}
 				}
 
 				stmp::optional<NetPacketReader> readerOrNone;
 
 				if (event.type == ENET_EVENT_TYPE_RECEIVE) {
+					if (cg_DemoRecord && DemoStarted) {
+						RegisterDemoPacket(event.packet);
+					} else if (DemoStarted) {
+						DemoStopRecord(); //stop if disable midgame. but cant enable midgame again
+					}
+
 					readerOrNone.reset(event.packet);
 					auto &reader = readerOrNone.value();
 
@@ -1850,6 +1868,58 @@ namespace spades {
 				host->totalReceivedData = 0;
 				sw.Reset();
 			}
+		}
+
+		//from sByte: https://github.com/xtreme8000/BetterSpades/commit/1f7fd9169dd33647a1f4515c453cc65fec45dc54
+		struct Demo CurrentDemo;
+		static const struct Demo ResetStruct;
+	
+		FILE* NetClient::CreateDemoFile(std::string demo) {
+			time_t current_time = time(NULL);
+			char* str_time = ctime(&current_time);
+
+			std::string test = "Demos/test.demo";
+			demo = "UserResources/" + test;
+			//demo = "UserResources/" + demo;
+		
+			FILE* file;
+			file = fopen(demo.c_str(), "wb");
+
+			// aos_replay version + 0.75 version
+			unsigned char value = 1;
+			fwrite(&value, sizeof(value), 1, file);
+	
+			value = 3;
+			fwrite(&value, sizeof(value), 1, file);
+		
+			return file;
+		}
+
+		void NetClient::RegisterDemoPacket(ENetPacket *packet) {
+			if (!CurrentDemo.fp)
+				return;
+			
+			float c_time = time(NULL) - CurrentDemo.start_time;
+			unsigned short len = packet->dataLength;
+			
+			fwrite(&c_time, sizeof(c_time), 1, CurrentDemo.fp);
+			fwrite(&len, sizeof(len), 1, CurrentDemo.fp);
+			fwrite(packet->data, packet->dataLength, 1, CurrentDemo.fp);
+
+			SPLog("register success");
+		}
+
+		void NetClient::DemoStartRecord(std::string file_name) {
+			CurrentDemo.fp = CreateDemoFile(file_name);
+			CurrentDemo.start_time = time(NULL);
+			DemoStarted = true;
+		}
+
+		void NetClient::DemoStopRecord() {
+			fclose(CurrentDemo.fp);
+		
+			CurrentDemo = ResetStruct;
+			DemoStarted = false;
 		}
 	}
 }
