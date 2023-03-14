@@ -689,6 +689,11 @@ namespace spades {
 			layouter.AddToggleField(_Tr("Preferences", "Spectator Player Names"), "dd_specNames");							// ADDED
 			layouter.AddToggleField(_Tr("Preferences", "Spectator Wallhack"), "dd_specWallhack");							// ADDED
 
+			layouter.AddHeading(_Tr("Preferences", "Demo Recording"));
+			layouter.AddToggleField(_Tr("Preferences", "Enable Demo Recording"), "cg_DemoRecord");
+			layouter.AddParag(_Tr("Preferences", "instantly ends demo if disabled while connected. however u cant start"));
+			layouter.AddParag(_Tr("Preferences", "a demo while connected as mapdata would be missing by that point. "));
+
 			layouter.AddHeading(_Tr("Preferences", "Feedbacks"));
 			layouter.AddToggleField(_Tr("Preferences", "Chat Notify Sounds"), "cg_chatBeep");
 			layouter.AddToggleField(_Tr("Preferences", "Hit Indicator"), "cg_hitIndicator");

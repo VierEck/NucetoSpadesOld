@@ -45,7 +45,11 @@
 #include <Core/Strings.h>
 #include <Core/TMPUtils.h>
 
+#include <Core/DirectoryFileSystem.h>
+#include <stdio.h>
+
 DEFINE_SPADES_SETTING(cg_unicode, "1");
+DEFINE_SPADES_SETTING(cg_DemoRecord, "1");
 
 namespace spades {
 	namespace client {
@@ -389,6 +393,7 @@ namespace spades {
 				enet_host_destroy(host);
 			bandwidthMonitor.reset();
 			SPLog("ENet host destroyed");
+			DemoStopRecord();
 		}
 
 		void NetClient::Connect(const ServerAddress &hostname) {
@@ -500,6 +505,19 @@ namespace spades {
 				stmp::optional<NetPacketReader> readerOrNone;
 
 				if (event.type == ENET_EVENT_TYPE_RECEIVE) {
+					if (cg_DemoRecord && DemoStarted) {
+						if (event.packet->data[0] != 15) {
+							RegisterDemoPacket(event.packet);
+						} else {
+							int player_id = event.packet->data[1];
+							event.packet->data[1] = 33;
+							RegisterDemoPacket(event.packet);
+							event.packet->data[1] = player_id;
+						}
+					} else if (DemoStarted) {
+						DemoStopRecord(); //stop if disable midgame. but cant enable midgame again
+					}
+
 					readerOrNone.reset(event.packet);
 					auto &reader = readerOrNone.value();
 
@@ -1850,6 +1868,50 @@ namespace spades {
 				host->totalReceivedData = 0;
 				sw.Reset();
 			}
+		}
+
+		//from sByte: https://github.com/xtreme8000/BetterSpades/commit/1f7fd9169dd33647a1f4515c453cc65fec45dc54
+		struct Demo CurrentDemo;
+		static const struct Demo ResetStruct;
+	
+		FILE* NetClient::CreateDemoFile(std::string file_name) {
+			FILE* file;
+			file = fopen(file_name.c_str(), "wb");
+
+			// aos_replay version + 0.75 version
+			unsigned char value = 1;
+			fwrite(&value, sizeof(value), 1, file);
+	
+			value = 3;
+			fwrite(&value, sizeof(value), 1, file);
+		
+			return file;
+		}
+
+		void NetClient::RegisterDemoPacket(ENetPacket *packet) {
+			if (!CurrentDemo.fp)
+				return;
+			
+			float c_time = client->time - CurrentDemo.start_time;
+			unsigned short len = packet->dataLength;
+			
+			fwrite(&c_time, sizeof(c_time), 1, CurrentDemo.fp);
+			fwrite(&len, sizeof(len), 1, CurrentDemo.fp);
+			fwrite(packet->data, packet->dataLength, 1, CurrentDemo.fp);
+		}
+
+		void NetClient::DemoStartRecord(std::string file_name) {
+			CurrentDemo.fp = CreateDemoFile(file_name);
+			CurrentDemo.start_time = client->time;
+			DemoStarted = true;
+		}
+
+		void NetClient::DemoStopRecord() {
+			DemoStarted = false;
+			if (CurrentDemo.fp)
+				fclose(CurrentDemo.fp);
+		
+			CurrentDemo = ResetStruct;
 		}
 	}
 }
