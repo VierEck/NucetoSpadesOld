@@ -45,9 +45,6 @@
 #include <Core/Strings.h>
 #include <Core/TMPUtils.h>
 
-#include <Core/DirectoryFileSystem.h>
-#include <stdio.h>
-
 DEFINE_SPADES_SETTING(cg_unicode, "1");
 DEFINE_SPADES_SETTING(cg_DemoRecord, "1");
 
