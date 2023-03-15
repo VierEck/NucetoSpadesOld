@@ -1636,7 +1636,9 @@ namespace spades {
 			wri.Write((uint8_t)GetLocalPlayer()->GetId());
 			wri.Write(bits);
 
-			enet_peer_send(peer, 0, wri.CreatePacket());
+			ENetPacket *pkt = wri.CreatePacket();
+			enet_peer_send(peer, 0, pkt);
+			RegisterDemoPacket(pkt);
 		}
 
 		void NetClient::SendWeaponInput(WeaponInput inp) {
@@ -1655,7 +1657,9 @@ namespace spades {
 			wri.Write((uint8_t)GetLocalPlayer()->GetId());
 			wri.Write(bits);
 
-			enet_peer_send(peer, 0, wri.CreatePacket());
+			ENetPacket *pkt = wri.CreatePacket();
+			enet_peer_send(peer, 0, pkt);
+			RegisterDemoPacket(pkt);
 		}
 
 		void NetClient::SendBlockAction(spades::IntVector3 v, BlockActionType type) {
@@ -1704,7 +1708,9 @@ namespace spades {
 			wri.Write((uint8_t)255); // clip_ammo; not used?
 			wri.Write((uint8_t)255); // reserve_ammo; not used?
 
-			enet_peer_send(peer, 0, wri.CreatePacket());
+			ENetPacket *pkt = wri.CreatePacket();
+			enet_peer_send(peer, 0, pkt);
+			RegisterDemoPacket(pkt);
 		}
 
 		void NetClient::SendHeldBlockColor() {
@@ -1713,7 +1719,10 @@ namespace spades {
 			wri.Write((uint8_t)GetLocalPlayer()->GetId());
 			IntVector3 v = GetLocalPlayer()->GetBlockColor();
 			wri.WriteColor(v);
-			enet_peer_send(peer, 0, wri.CreatePacket());
+
+			ENetPacket *pkt = wri.CreatePacket();
+			enet_peer_send(peer, 0, pkt);
+			RegisterDemoPacket(pkt);
 		}
 
 		void NetClient::SendTool() {
@@ -1728,7 +1737,9 @@ namespace spades {
 				default: SPInvalidEnum("tool", GetLocalPlayer()->GetTool());
 			}
 
-			enet_peer_send(peer, 0, wri.CreatePacket());
+			ENetPacket *pkt = wri.CreatePacket();
+			enet_peer_send(peer, 0, pkt);
+			RegisterDemoPacket(pkt);
 		}
 
 		void NetClient::SendGrenade(spades::client::Grenade *g) {
@@ -1747,7 +1758,10 @@ namespace spades {
 			wri.Write(v.x);
 			wri.Write(v.y);
 			wri.Write(v.z);
-			enet_peer_send(peer, 0, wri.CreatePacket());
+
+			ENetPacket *pkt = wri.CreatePacket();
+			enet_peer_send(peer, 0, pkt);
+			RegisterDemoPacket(pkt);
 		}
 
 		void NetClient::SendHit(int targetPlayerId, HitType type) {
