@@ -1903,7 +1903,7 @@ namespace spades {
 			if (!CurrentDemo.fp)
 				return;
 			
-			float c_time = client->time - CurrentDemo.start_time;
+			float c_time = client->GetTimeGlobal() - CurrentDemo.start_time;
 			unsigned short len = packet->dataLength;
 			
 			fwrite(&c_time, sizeof(c_time), 1, CurrentDemo.fp);
@@ -1913,7 +1913,7 @@ namespace spades {
 
 		void NetClient::DemoStartRecord(std::string file_name) {
 			CurrentDemo.fp = CreateDemoFile(file_name);
-			CurrentDemo.start_time = client->time;
+			CurrentDemo.start_time = client->GetTimeGlobal();
 			DemoStarted = true;
 		}
 

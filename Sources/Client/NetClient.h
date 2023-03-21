@@ -169,7 +169,7 @@ namespace spades {
 		};
 		struct Demo {
 			FILE* fp;
-			time_t start_time;
+			float start_time;
 		};
 	}
 }
