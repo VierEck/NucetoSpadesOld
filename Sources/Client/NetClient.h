@@ -167,14 +167,13 @@ namespace spades {
 			void DemoStop();
 			bool DemoStarted = false;
 			void joinReplay();
-			void ReadNextDemoPacket();
+			std::vector<char> ReadNextDemoPacket();
 			void DoDemo();
 		};
 		struct Demo {
 			FILE* fp;
 			float start_time;
 			float delta_time;
-			std::vector<char> data;
 		};
 	}
 }

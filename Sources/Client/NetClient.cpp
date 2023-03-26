@@ -2008,20 +2008,23 @@ namespace spades {
 			HandleGamePacket(read);
 		}
 
-		void NetClient::ReadNextDemoPacket() {
+		std::vector<char> NetClient::ReadNextDemoPacket() {
 			if (!CurrentDemo.fp)
 				throw 1;
 
 			float c_time;
 			unsigned short len;
+			std::vector<char> data;
 
 			fread(&c_time, sizeof(c_time), 1, CurrentDemo.fp);
 			CurrentDemo.delta_time = c_time;
 
 			fread(&len, sizeof(len), 1, CurrentDemo.fp);
-			CurrentDemo.data.resize(len);
+			data.resize(len);
 
-			fread(CurrentDemo.data.data(), len, 1, CurrentDemo.fp);
+			fread(data.data(), len, 1, CurrentDemo.fp);
+
+			return data;
 		}
 
 		void NetClient::DoDemo() {
@@ -2029,8 +2032,7 @@ namespace spades {
 				return;
 
 			while (CurrentDemo.start_time + CurrentDemo.delta_time <= client->GetTimeGlobal()) {
-				ReadNextDemoPacket();
-				NetPacketReader reader(CurrentDemo.data);
+				NetPacketReader reader(ReadNextDemoPacket());
 
 				if (status == NetClientStatusConnecting) {
 					if (reader.GetType() != PacketTypeMapStart) {
