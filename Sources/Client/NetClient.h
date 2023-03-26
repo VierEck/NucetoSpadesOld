@@ -118,7 +118,7 @@ namespace spades {
 			void SendVersionEnhanced(const std::set<std::uint8_t> &propertyIds);
 
 		public:
-			NetClient(Client *);
+			NetClient(Client *, bool replay);
 			~NetClient();
 
 			NetClientStatus GetStatus() { return status; }
@@ -161,15 +161,20 @@ namespace spades {
 			double GetDownlinkBps() { return bandwidthMonitor->GetDownlinkBps(); }
 			double GetUplinkBps() { return bandwidthMonitor->GetUplinkBps(); }
 
-			FILE* CreateDemoFile(std::string);
+			FILE* HandleDemoFile(std::string, bool replay);
 			void RegisterDemoPacket(ENetPacket *packet);
-			void DemoStartRecord(std::string);
-			void DemoStopRecord();
+			void DemoStart(std::string, bool replay);
+			void DemoStop();
 			bool DemoStarted = false;
+			void joinReplay();
+			void ReadNextDemoPacket();
+			void DoDemo();
 		};
 		struct Demo {
 			FILE* fp;
 			float start_time;
+			float delta_time;
+			std::vector<char> data;
 		};
 	}
 }

@@ -1218,7 +1218,7 @@ namespace spades {
 				}
 			}
 
-			if (net) {
+			if (net && !Replaying) {
 				auto ping = net->GetPing();
 				auto upbps = net->GetUplinkBps();
 				auto downbps = net->GetDownlinkBps();
@@ -1263,7 +1263,7 @@ namespace spades {
 			r->DrawImage(nullptr, AABB2(pos.x, pos.y, size.x, size.y));
 			font->DrawShadow(str, pos + Vector2(margin, margin), 1.f, Vector4(1.f, 1.f, 1.f, a), Vector4(0.f, 0.f, 0.f, a2));
 			
-			if (n_StatsColor){
+			if (n_StatsColor && !Replaying){
 			
 			//fps
 			auto fps = fpsCounter.GetFps();

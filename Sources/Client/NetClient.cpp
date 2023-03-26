@@ -351,24 +351,27 @@ namespace spades {
 			}
 		};
 
-		NetClient::NetClient(Client *c) : client(c), host(nullptr), peer(nullptr) {
+		NetClient::NetClient(Client *c, bool replay) : client(c), host(nullptr), peer(nullptr) {
 			SPADES_MARK_FUNCTION();
 
-			enet_initialize();
-			SPLog("ENet initialized");
+			if (!replay) {
+				enet_initialize();
+				SPLog("ENet initialized");
 
-			host = enet_host_create(NULL, 1, 1, 100000, 100000);
-			SPLog("ENet host created");
-			if (!host) {
-				SPRaise("Failed to create ENet host");
+				host = enet_host_create(NULL, 1, 1, 100000, 100000);
+				SPLog("ENet host created");
+				if (!host) {
+					SPRaise("Failed to create ENet host");
+				}
+
+				if (enet_host_compress_with_range_coder(host) < 0)
+					SPRaise("Failed to enable ENet Range coder.");
+
+				SPLog("ENet Range Coder Enabled");
 			}
 
-			if (enet_host_compress_with_range_coder(host) < 0)
-				SPRaise("Failed to enable ENet Range coder.");
-
-			SPLog("ENet Range Coder Enabled");
-
 			peer = NULL;
+
 			status = NetClientStatusNotConnected;
 
 			lastPlayerInput = 0;
@@ -380,7 +383,9 @@ namespace spades {
 
 			std::fill(savedPlayerTeam.begin(), savedPlayerTeam.end(), -1);
 
-			bandwidthMonitor.reset(new BandwidthMonitor(host));
+			if (!replay) {
+				bandwidthMonitor.reset(new BandwidthMonitor(host));
+			}
 		}
 		NetClient::~NetClient() {
 			SPADES_MARK_FUNCTION();
@@ -390,7 +395,7 @@ namespace spades {
 				enet_host_destroy(host);
 			bandwidthMonitor.reset();
 			SPLog("ENet host destroyed");
-			DemoStopRecord();
+			DemoStop();
 		}
 
 		void NetClient::Connect(const ServerAddress &hostname) {
@@ -512,7 +517,7 @@ namespace spades {
 							event.packet->data[1] = player_id;
 						}
 					} else if (DemoStarted) {
-						DemoStopRecord(); //stop if disable midgame. but cant enable midgame again
+						Disconnect(); //stop if disable midgame. but cant enable midgame again
 					}
 
 					readerOrNone.reset(event.packet);
@@ -1282,6 +1287,9 @@ namespace spades {
 							}
 						}
 						client->JoinedGame();
+
+						if (client->Replaying)
+							joinReplay();
 					}
 					break;
 				case PacketTypeKillAction: {
@@ -1331,7 +1339,6 @@ namespace spades {
 						}
 					} else {
 						client->ServerSentMessage(txt);
-
 						// Speculate the best game properties based on the server generated
 						// messages
 						properties->HandleServerMessage(txt);
@@ -1521,6 +1528,9 @@ namespace spades {
 		}
 
 		void NetClient::SendVersionEnhanced(const std::set<std::uint8_t> &propertyIds) {
+			if (client->Replaying)
+				return;
+
 			NetPacketWriter wri(PacketTypeExistingPlayer);
 			wri.Write((uint8_t)'x');
 
@@ -1560,6 +1570,9 @@ namespace spades {
 		}
 
 		void NetClient::SendJoin(int team, WeaponType weapType, std::string name, int kills) {
+			if (client->Replaying)
+				return;
+
 			SPADES_MARK_FUNCTION();
 			int weapId;
 			switch (weapType) {
@@ -1778,6 +1791,9 @@ namespace spades {
 		}
 
 		void NetClient::SendChat(std::string text, bool global) {
+			if (client->Replaying)
+				return;
+
 			SPADES_MARK_FUNCTION();
 			NetPacketWriter wri(PacketTypeChatMessage);
 			wri.Write((uint8_t)GetLocalPlayer()->GetId());
@@ -1788,6 +1804,9 @@ namespace spades {
 		}
 
 		void NetClient::SendWeaponChange(WeaponType wt) {
+			if (client->Replaying)
+				return;
+
 			SPADES_MARK_FUNCTION();
 			NetPacketWriter wri(PacketTypeChangeWeapon);
 			wri.Write((uint8_t)GetLocalPlayer()->GetId());
@@ -1800,6 +1819,9 @@ namespace spades {
 		}
 
 		void NetClient::SendTeamChange(int team) {
+			if (client->Replaying)
+				return;
+			
 			SPADES_MARK_FUNCTION();
 			NetPacketWriter wri(PacketTypeChangeTeam);
 			wri.Write((uint8_t)GetLocalPlayer()->GetId());
@@ -1808,6 +1830,9 @@ namespace spades {
 		}
 
 		void NetClient::SendHandShakeValid(int challenge) {
+			if (client->Replaying)
+				return;
+
 			SPADES_MARK_FUNCTION();
 			NetPacketWriter wri(PacketTypeHandShakeReturn);
 			wri.Write((uint32_t)challenge);
@@ -1816,6 +1841,9 @@ namespace spades {
 		}
 
 		void NetClient::SendVersion() {
+			if (client->Replaying)
+				return;
+
 			SPADES_MARK_FUNCTION();
 			NetPacketWriter wri(PacketTypeVersionSend);
 			wri.Write((uint8_t)'o');
@@ -1883,18 +1911,53 @@ namespace spades {
 
 		//from sByte: https://github.com/xtreme8000/BetterSpades/commit/1f7fd9169dd33647a1f4515c453cc65fec45dc54
 		struct Demo CurrentDemo;
-		static const struct Demo ResetStruct;
+		struct Demo ResetStruct;
 	
-		FILE* NetClient::CreateDemoFile(std::string file_name) {
+		FILE* NetClient::HandleDemoFile(std::string file_name, bool replay) {
 			FILE* file;
-			file = fopen(file_name.c_str(), "wb");
+			if (!replay) {
+				file = fopen(file_name.c_str(), "wb");
 
-			// aos_replay version + 0.75 version
-			unsigned char value = 1;
-			fwrite(&value, sizeof(value), 1, file);
+				// aos_replay version + 0.75 version
+				unsigned char value = 1;
+				fwrite(&value, sizeof(value), 1, file);
 	
-			value = 3;
-			fwrite(&value, sizeof(value), 1, file);
+				value = 3;
+				fwrite(&value, sizeof(value), 1, file);
+			} else {
+				file = fopen(file_name.c_str(), "rb");
+
+				// aos_replay version + 0.75/0.76 version
+				unsigned char value;
+				fread(&value, sizeof(value), 1, file);
+				if (value != 1) {
+					SPLog("Unsupported aos_replay Demo version: %u", value);
+					throw 1;
+				}
+
+				ProtocolVersion version;
+				fread(&value, sizeof(value), 1, file);
+				if (value != 3 && value != 4) {
+					SPLog("Unsupported AoS protocol version: %u", value);
+					throw 1;
+				} else {
+					protocolVersion = value;
+					if (value == 3) {
+						version = ProtocolVersion::v075;
+					} else {
+						version = ProtocolVersion::v076;
+					}
+						
+				}
+
+				savedPackets.clear();
+
+				properties.reset(new GameProperties(version));
+
+				status = NetClientStatusConnecting;
+				statusString = _Tr("Demo Replay", "Reading demo file");
+				timeToTryMapLoad = 0;
+			}
 		
 			return file;
 		}
@@ -1911,18 +1974,165 @@ namespace spades {
 			fwrite(packet->data, packet->dataLength, 1, CurrentDemo.fp);
 		}
 
-		void NetClient::DemoStartRecord(std::string file_name) {
-			CurrentDemo.fp = CreateDemoFile(file_name);
+		void NetClient::DemoStart(std::string file_name, bool replay) {
+			try {
+				CurrentDemo.fp = HandleDemoFile(file_name, replay);
+			} catch (...) {
+				return;
+			}
 			CurrentDemo.start_time = client->GetTimeGlobal();
-			DemoStarted = true;
+			CurrentDemo.delta_time = 0.0f;
+			DemoStarted = !replay;
 		}
 
-		void NetClient::DemoStopRecord() {
+		void NetClient::DemoStop() {
 			DemoStarted = false;
 			if (CurrentDemo.fp)
 				fclose(CurrentDemo.fp);
 		
 			CurrentDemo = ResetStruct;
+		}
+
+		void NetClient::joinReplay() {
+			SPADES_SETTING(cg_playerName);
+			NetPacketWriter wri(PacketTypeExistingPlayer);
+			wri.Write((uint8_t)33);
+			wri.Write((uint8_t)255);
+			wri.Write((uint8_t)0);
+			wri.Write((uint8_t)2);
+			wri.Write((uint32_t)0);
+			wri.WriteColor(GetWorld()->GetTeam(255).color);
+			wri.Write(cg_playerName, 16);
+			NetPacketReader read(wri.CreatePacket());
+
+			HandleGamePacket(read);
+		}
+
+		void NetClient::ReadNextDemoPacket() {
+			if (!CurrentDemo.fp)
+				throw 1;
+
+			float c_time;
+			unsigned short len;
+
+			fread(&c_time, sizeof(c_time), 1, CurrentDemo.fp);
+			CurrentDemo.delta_time = c_time;
+
+			fread(&len, sizeof(len), 1, CurrentDemo.fp);
+			CurrentDemo.data.resize(len);
+
+			fread(CurrentDemo.data.data(), len, 1, CurrentDemo.fp);
+		}
+
+		void NetClient::DoDemo() {
+			if (CurrentDemo.start_time + CurrentDemo.delta_time > client->GetTimeGlobal())
+				return;
+
+			while (CurrentDemo.start_time + CurrentDemo.delta_time <= client->GetTimeGlobal()) {
+				ReadNextDemoPacket();
+				NetPacketReader reader(CurrentDemo.data);
+
+				if (status == NetClientStatusConnecting) {
+					if (reader.GetType() != PacketTypeMapStart) {
+						SPRaise("Unexpected packet: %d", (int)reader.GetType());
+					}
+					reader.DumpDebug();
+					mapSize = reader.ReadInt();
+					status = NetClientStatusReceivingMap;
+					statusString = _Tr("Demo Replay", "Loading snapshot");
+					timeToTryMapLoad = 30;
+					tryMapLoadOnPacketType = true;
+				} else if (status == NetClientStatusReceivingMap) {
+					if (reader.GetType() == PacketTypeMapChunk) {
+						std::vector<char> dt = reader.GetData();
+						dt.erase(dt.begin());
+						mapData.insert(mapData.end(), dt.begin(), dt.end());
+
+						timeToTryMapLoad = 200;
+
+						statusString = _Tr("Demo Replay", "Loading snapshot ({0}/{1})",
+						                   mapData.size(), mapSize);
+
+						if (mapSize == mapData.size()) {
+							status = NetClientStatusConnected;
+							statusString = _Tr("Demo Replay", "Connected");
+
+							try {
+								MapLoaded();
+							} catch (const std::exception &ex) {
+								if (strstr(ex.what(), "File truncated") ||
+								    strstr(ex.what(), "EOF reached")) {
+									SPLog("Map decoder returned error. Maybe we will get more "
+									      "data...:\n%s",
+									      ex.what());
+									// hack: more data to load...
+									status = NetClientStatusReceivingMap;
+									statusString = _Tr("Demo Replay", "Still loading...");
+								} else {
+									DemoStop();
+									statusString = _Tr("Demo Replay", "Error");
+									throw;
+								}
+
+							} catch (...) {
+								DemoStop();
+								statusString = _Tr("Demo Replay", "Error");
+								throw;
+							}
+						}
+
+					} else {
+						reader.DumpDebug();
+						if (reader.GetType() == PacketTypeWeaponReload) {
+							// Drop reload packets
+						} else if (reader.GetType() != PacketTypeWorldUpdate &&
+						           reader.GetType() != PacketTypeExistingPlayer &&
+						           reader.GetType() != PacketTypeCreatePlayer &&
+						           tryMapLoadOnPacketType) {
+							status = NetClientStatusConnected;
+							statusString = _Tr("Demo Replay", "Connected");
+
+							try {
+								MapLoaded();
+							} catch (const std::exception &ex) {
+								tryMapLoadOnPacketType = false;
+								if (strstr(ex.what(), "File truncated") ||
+								    strstr(ex.what(), "EOF reached")) {
+									reader.DumpDebug();
+									SPLog("Map decoder returned error. Maybe we will get more "
+									      "data...:\n%s",
+									      ex.what());
+									// hack: more data to load...
+									status = NetClientStatusReceivingMap;
+									statusString = _Tr("Demo Replay", "Still loading...");
+									goto stillLoading;
+								} else {
+									DemoStop();
+									statusString = _Tr("Demo Replay", "Error");
+									throw;
+								}
+							} catch (...) {
+								DemoStop();
+								statusString = _Tr("Demo Replay", "Error");
+								throw;
+							}
+							HandleGamePacket(reader);
+						} else {
+						stillLoading:
+							savedPackets.push_back(reader.GetData());
+						}
+					}
+				}  else if (status == NetClientStatusConnected) {
+			 		try {
+						HandleGamePacket(reader);
+					} catch (const std::exception &ex) {
+						int type = reader.GetType();
+						reader.DumpDebug();
+						SPRaise("Exception while handling packet type 0x%08x:\n%s", type,
+						        ex.what());
+					}
+				}
+			}
 		}
 	}
 }

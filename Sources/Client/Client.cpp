@@ -382,8 +382,14 @@ namespace spades {
 			mumbleLink.setContext(hostname.ToString(false));
 			mumbleLink.setIdentity(playerName);
 
+			net.reset(new NetClient(this, Replaying));
+
+			if (Replaying)
+				net->DemoStart(demo_file, true);
+				SPLog("Started Demo Replay '%s'", demo_file.c_str());
+				return;
+
 			SPLog("Started connecting to '%s'", hostname.ToString(true).c_str());
-			net.reset(new NetClient(this));
 			net->Connect(hostname);
 
 			// decide log file name
@@ -418,7 +424,7 @@ namespace spades {
 			}
 
 			if (cg_DemoRecord)
-				net->DemoStartRecord(demo);
+				net->DemoStart(demo, false);
 		}
 
 		void Client::RunFrame(float dt) {
@@ -433,6 +439,8 @@ namespace spades {
 
 				frameToRendererInit--;
 				if (frameToRendererInit == 0) {
+					Replaying = true; //temporar test
+					demo_file = "Demos/test.demo";
 					DoInit();
 
 				} else {
@@ -443,18 +451,27 @@ namespace spades {
 			timeSinceInit += std::min(dt, .03f);
 
 			// update network
-			try {
-				if (net->GetStatus() == NetClientStatusConnected)
-					net->DoEvents(0);
-				else
-					net->DoEvents(10);
-			} catch (const std::exception &ex) {
-				if (net->GetStatus() == NetClientStatusNotConnected) {
-					SPLog("Disconnected because of error:\n%s", ex.what());
-					NetLog("Disconnected because of error:\n%s", ex.what());
+			if (!Replaying) {
+				try {
+					if (net->GetStatus() == NetClientStatusConnected)
+						net->DoEvents(0);
+					else
+						net->DoEvents(10);
+				} catch (const std::exception &ex) {
+					if (net->GetStatus() == NetClientStatusNotConnected) {
+						SPLog("Disconnected because of error:\n%s", ex.what());
+						NetLog("Disconnected because of error:\n%s", ex.what());
+						throw;
+					} else {
+						SPLog("Exception while processing network packets (ignored):\n%s", ex.what());
+					}
+				}
+			} else {
+				try {
+					net->DoDemo();
+				} catch (...) {
+					SPLog("Something was wrong with the Demo Replay");
 					throw;
-				} else {
-					SPLog("Exception while processing network packets (ignored):\n%s", ex.what());
 				}
 			}
 

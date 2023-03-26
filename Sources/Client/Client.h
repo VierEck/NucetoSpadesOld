@@ -492,6 +492,9 @@ namespace spades {
 			bool hitTestSizeToggle;
 
 			float GetTimeGlobal() { return time; }
+
+			bool Replaying;
+			std::string demo_file;
 		};
 	}
 }
