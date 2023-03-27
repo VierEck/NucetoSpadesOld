@@ -404,7 +404,7 @@ namespace spades {
 			~Client();
 
 		public:
-			Client(IRenderer *, IAudioDevice *, const ServerAddress &host, FontManager *);
+			Client(IRenderer *, IAudioDevice *, const ServerAddress &host, FontManager *, bool replay, std::string demo_name);
 
 			void RunFrame(float dt) override;
 

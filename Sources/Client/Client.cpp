@@ -91,7 +91,7 @@ namespace spades {
 		// END OF ADDED
         
 		Client::Client(IRenderer *r, IAudioDevice *audioDev, const ServerAddress &host,
-		               FontManager *fontManager)
+		               FontManager *fontManager, bool replay, std::string demo_name)
 		    : playerName(cg_playerName.operator std::string().substr(0, 15)),
 		      logStream(nullptr),
 		      hostname(host),
@@ -102,7 +102,8 @@ namespace spades {
 		      time(0.f),
 		      readyToClose(false),
 
-
+			  Replaying(replay),
+			  demo_file(demo_name),
 
 		      worldSubFrame(0.f),
 		      frameToRendererInit(5),
@@ -384,10 +385,11 @@ namespace spades {
 
 			net.reset(new NetClient(this, Replaying));
 
-			if (Replaying)
+			if (Replaying) {
 				net->DemoStart(demo_file, true);
 				SPLog("Started Demo Replay '%s'", demo_file.c_str());
 				return;
+			}
 
 			SPLog("Started connecting to '%s'", hostname.ToString(true).c_str());
 			net->Connect(hostname);
@@ -439,10 +441,7 @@ namespace spades {
 
 				frameToRendererInit--;
 				if (frameToRendererInit == 0) {
-					Replaying = true; //temporar test
-					demo_file = "Demos/test.demo";
 					DoInit();
-
 				} else {
 					return;
 				}
@@ -470,7 +469,7 @@ namespace spades {
 				try {
 					net->DoDemo();
 				} catch (...) {
-					SPLog("Something was wrong with the Demo Replay");
+					SPLog("Something was wrong with the Demo Replay or it Ended");
 					throw;
 				}
 			}

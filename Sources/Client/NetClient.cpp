@@ -1932,14 +1932,14 @@ namespace spades {
 				fread(&value, sizeof(value), 1, file);
 				if (value != 1) {
 					SPLog("Unsupported aos_replay Demo version: %u", value);
-					throw 1;
+					throw;
 				}
 
 				ProtocolVersion version;
 				fread(&value, sizeof(value), 1, file);
 				if (value != 3 && value != 4) {
 					SPLog("Unsupported AoS protocol version: %u", value);
-					throw 1;
+					throw;
 				} else {
 					protocolVersion = value;
 					if (value == 3) {
@@ -2008,31 +2008,46 @@ namespace spades {
 			HandleGamePacket(read);
 		}
 
-		std::vector<char> NetClient::ReadNextDemoPacket() {
+		void NetClient::ReadNextDemoPacket() {
 			if (!CurrentDemo.fp)
-				throw 1;
+				return;
 
 			float c_time;
 			unsigned short len;
-			std::vector<char> data;
 
-			fread(&c_time, sizeof(c_time), 1, CurrentDemo.fp);
+			if (fread(&c_time, sizeof(c_time), 1, CurrentDemo.fp) != 1) {
+				if (GetWorld()) {
+					client->SetWorld(NULL);
+				}
+				status = NetClientStatusNotConnected;
+				if (feof(CurrentDemo.fp)) {
+					statusString = "Demo Ended: End of Recording reached";
+					SPRaise("Demo Ended: End of Recording reached");
+				} else {
+					statusString = "Demo Ended: Error";
+					SPRaise("Demo Ended: Error");
+				}
+				throw;
+			}
 			CurrentDemo.delta_time = c_time;
 
 			fread(&len, sizeof(len), 1, CurrentDemo.fp);
-			data.resize(len);
+			CurrentDemo.data.resize(len);
 
-			fread(data.data(), len, 1, CurrentDemo.fp);
-
-			return data;
+			fread(CurrentDemo.data.data(), len, 1, CurrentDemo.fp);
 		}
 
 		void NetClient::DoDemo() {
-			if (CurrentDemo.start_time + CurrentDemo.delta_time > client->GetTimeGlobal())
+			if (CurrentDemo.start_time + CurrentDemo.delta_time > client->GetTimeGlobal() || status == NetClientStatusNotConnected)
 				return;
 
 			while (CurrentDemo.start_time + CurrentDemo.delta_time <= client->GetTimeGlobal()) {
-				NetPacketReader reader(ReadNextDemoPacket());
+				try {
+					ReadNextDemoPacket();
+				} catch (...) {
+					throw;
+				}
+				NetPacketReader reader(CurrentDemo.data);
 
 				if (status == NetClientStatusConnecting) {
 					if (reader.GetType() != PacketTypeMapStart) {

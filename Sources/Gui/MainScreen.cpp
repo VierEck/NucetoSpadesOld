@@ -305,11 +305,9 @@ namespace spades {
 			c.ExecuteChecked();
 		}
 
-		std::string MainScreen::Connect(const ServerAddress &host) {
+		std::string MainScreen::Connect(const ServerAddress &host, bool replay, std::string demo_name) {
 			try {
-				subview.Set(new client::Client(&*renderer, &*audioDevice, host,
-				                               fontManager),
-				            false);
+				subview.Set(new client::Client(&*renderer, &*audioDevice, host, fontManager, replay, demo_name),false);
 			} catch (const std::exception &ex) {
 				SPLog("[!] Error while initializing a game client: %s", ex.what());
 				return ex.what();

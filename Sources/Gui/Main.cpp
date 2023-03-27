@@ -231,7 +231,7 @@ namespace spades {
 			spades::gui::View *CreateView(spades::client::IRenderer *renderer,
 			                                      spades::client::IAudioDevice *audio) override {
 				Handle<client::FontManager> fontManager(new client::FontManager(renderer), false);
-				return new spades::client::Client(renderer, audio, addr, fontManager);
+				return new spades::client::Client(renderer, audio, addr, fontManager, false, "");
 			}
 
 		public:
