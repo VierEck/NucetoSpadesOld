@@ -112,10 +112,27 @@ namespace spades {
 
 		name = file_name;
 		ip = "aos://16777343:32887";
-		map = " ";
-		gameMode = "Demo";
+		gameMode = " ";
 		country = " ";
-		version = "0.75";
+
+		FILE *file;
+		file = fopen(("Demos/" + file_name).c_str(), "rb");
+		unsigned char value;
+		fread(&value, sizeof(value), 1, file);
+		if (value == 1) {
+			map = " ";
+		} else {
+			map = "invalid aos_replay version";
+		}
+		fread(&value, sizeof(value), 1, file);
+		if (value == 3) {
+			version = "0.75";
+		} else if (value == 4) {
+			version = "0.76";
+		} else {
+			version = "invalid";
+		}
+		fclose(file);
 
 		item = new ServerItem(name, ip, map, gameMode, country, version, ping, players, maxPlayers);
 		

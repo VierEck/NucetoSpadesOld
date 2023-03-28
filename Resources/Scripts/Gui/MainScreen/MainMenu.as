@@ -396,25 +396,27 @@ namespace spades {
             MainScreenServerItem@[]@ list2 = array<spades::MainScreenServerItem@>();
             for(int i = 0, count = list.length; i < count; i++) {
                 MainScreenServerItem@ item = list[i];
-                if(filterProtocol3 and (item.Protocol != "0.75")) {
-                    continue;
-                }
-                if(filterProtocol4 and (item.Protocol != "0.76")) {
-                    continue;
-                }
-                if(filterEmpty and (item.NumPlayers > 0)) {
-                    continue;
-                }
-                if(filterFull and (item.NumPlayers >= item.MaxPlayers)) {
-                    continue;
-                }
-                if(filterText.length > 0) {
-                    if(not (StringContainsCaseInsensitive(item.Name, filterText) or
-                        StringContainsCaseInsensitive(item.MapName, filterText) or
-                        StringContainsCaseInsensitive(item.GameMode, filterText))) {
-                        continue;
-                    }
-                }
+				if(filterProtocol3 and (item.Protocol != "0.75")) {
+					continue;
+				}
+				if(filterProtocol4 and (item.Protocol != "0.76")) {
+					continue;
+				}
+				if (!Replay) {
+					if(filterEmpty and (item.NumPlayers > 0)) {
+						continue;
+					}
+					if(filterFull and (item.NumPlayers >= item.MaxPlayers)) {
+						continue;
+					}
+					if(filterText.length > 0) {
+						if(not (StringContainsCaseInsensitive(item.Name, filterText) or
+							StringContainsCaseInsensitive(item.MapName, filterText) or
+							StringContainsCaseInsensitive(item.GameMode, filterText))) {
+							continue;
+						}
+					}
+				}
                 list2.insertLast(item);
             }
 
@@ -474,19 +476,10 @@ namespace spades {
         }
 
         private void OnFilterProtocol3Pressed(spades::ui::UIElement@ sender) {
-			if (Replay) {
-				return;
-			}
-			if (Replay) {
-				return;
-			}
             filterProtocol4Button.Toggled = false;
             UpdateServerList();
         }
         private void OnFilterProtocol4Pressed(spades::ui::UIElement@ sender) {
-			if (Replay) {
-				return;
-			}
             filterProtocol3Button.Toggled = false;
             UpdateServerList();
         }
@@ -530,6 +523,9 @@ namespace spades {
         }
 
         private void Connect() {
+			if (addressField.Text == "") {
+				return;
+			}
 			string DemoFile = ""; 
 			if (Replay) {
 				DemoFile = "Demos/" + addressField.Text; //test
@@ -585,6 +581,11 @@ namespace spades {
 		private void OnChangeListPressed(spades::ui::UIElement@ sender) {
 			//change list
 			Replay = !Replay;
+			if (Replay) {
+				addressField.Text = "";
+			} else {
+				addressField.Text = cg_lastQuickConnectHost.StringValue;
+			}
             LoadServerList();
 		}
     }
