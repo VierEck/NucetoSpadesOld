@@ -517,7 +517,7 @@ namespace spades {
 							event.packet->data[1] = player_id;
 						}
 					} else if (DemoStarted) {
-						Disconnect(); //stop if disable midgame. but cant enable midgame again
+						DemoStop(); //stop if disable midgame. but cant enable midgame again
 					}
 
 					readerOrNone.reset(event.packet);
