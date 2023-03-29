@@ -166,15 +166,21 @@ namespace spades {
 			void DemoStart(std::string, bool replay);
 			void DemoStop();
 			bool DemoStarted = false;
+
 			void joinReplay();
 			void ReadNextDemoPacket();
 			void DoDemo();
+
+			void DemoCommands(std::string command);
 		};
 		struct Demo {
 			FILE* fp;
 			float start_time;
 			float delta_time;
+			float pause_time;
 			std::vector<char> data;
+			std::vector<PlayerInput> oldInp;
+			std::vector<WeaponInput> oldweap;
 		};
 	}
 }
