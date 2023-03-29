@@ -83,6 +83,7 @@ namespace spades {
         private ConfigItem cg_protocolVersion("cg_protocolVersion", "3");
         private ConfigItem cg_lastQuickConnectHost("cg_lastQuickConnectHost", "127.0.0.1");
         private ConfigItem cg_serverlistSort("cg_serverlistSort", "16385");
+		MainScreenServerItem@[]@ savedlist = array<spades::MainScreenServerItem@>();
 
         MainScreenMainMenu(MainScreenUI@ ui) {
             super(ui.manager);
@@ -393,7 +394,7 @@ namespace spades {
             bool filterEmpty = filterEmptyButton.Toggled;
             bool filterFull = filterFullButton.Toggled;
             string filterText = filterField.Text;
-            MainScreenServerItem@[]@ list2 = array<spades::MainScreenServerItem@>();
+			savedlist.resize(0);
             for(int i = 0, count = list.length; i < count; i++) {
                 MainScreenServerItem@ item = list[i];
 				if(filterProtocol3 and (item.Protocol != "0.75")) {
@@ -417,10 +418,10 @@ namespace spades {
 						}
 					}
 				}
-                list2.insertLast(item);
+				savedlist.insertLast(item);
             }
 
-            ServerListModel model(Manager, list2);
+            ServerListModel model(Manager, savedlist);
             @serverList.Model = model;
             @model.ItemActivated = ServerListItemEventHandler(this.ServerListItemActivated);
             @model.ItemDoubleClicked = ServerListItemEventHandler(this.ServerListItemDoubleClicked);
@@ -528,6 +529,17 @@ namespace spades {
 			}
 			string DemoFile = ""; 
 			if (Replay) {
+				bool Found = false; 
+				for(int i = 0, count = savedlist.length; i < count; i++) {
+					MainScreenServerItem@ item = savedlist[i];
+					if (item.Name == addressField.Text) {
+						Found = true;
+						break;
+					}
+				}
+				if (!Found) {
+					return;
+				}
 				DemoFile = "Demos/" + addressField.Text; //test
 				addressField.Text = "aos://16777343:32887";
 			}
