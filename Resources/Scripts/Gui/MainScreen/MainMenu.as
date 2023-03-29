@@ -410,12 +410,12 @@ namespace spades {
 					if(filterFull and (item.NumPlayers >= item.MaxPlayers)) {
 						continue;
 					}
-					if(filterText.length > 0) {
-						if(not (StringContainsCaseInsensitive(item.Name, filterText) or
-							StringContainsCaseInsensitive(item.MapName, filterText) or
-							StringContainsCaseInsensitive(item.GameMode, filterText))) {
-							continue;
-						}
+				}
+				if(filterText.length > 0) {
+					if(not (StringContainsCaseInsensitive(item.Name, filterText) or
+						StringContainsCaseInsensitive(item.MapName, filterText) or
+						StringContainsCaseInsensitive(item.GameMode, filterText))) {
+						continue;
 					}
 				}
 				savedlist.insertLast(item);
@@ -499,9 +499,6 @@ namespace spades {
             UpdateServerList();
         }
         private void OnFilterTextChanged(spades::ui::UIElement@ sender) {
-			if (Replay) {
-				return;
-			}
             UpdateServerList();
         }
 
