@@ -2117,6 +2117,7 @@ namespace spades {
 			if (CurrentDemo.pause_time != 0)
 				return;
 
+			float saved_start_time;
 			while (CurrentDemo.start_time + CurrentDemo.delta_time <= client->GetTimeGlobal()) {
 				try {
 					ReadNextDemoPacket();
@@ -2135,6 +2136,8 @@ namespace spades {
 					statusString = _Tr("Demo Replay", "Loading snapshot");
 					timeToTryMapLoad = 30;
 					tryMapLoadOnPacketType = true;
+					saved_start_time = CurrentDemo.start_time;
+					CurrentDemo.start_time = -60; //maptransfer cant be longer than a minute or so i hope. 
 				} else if (status == NetClientStatusReceivingMap) {
 					if (reader.GetType() == PacketTypeMapChunk) {
 						std::vector<char> dt = reader.GetData();
@@ -2149,6 +2152,7 @@ namespace spades {
 						if (mapSize == mapData.size()) {
 							status = NetClientStatusConnected;
 							statusString = _Tr("Demo Replay", "Connected");
+							CurrentDemo.start_time = saved_start_time - CurrentDemo.delta_time;
 
 							try {
 								MapLoaded();
@@ -2187,6 +2191,7 @@ namespace spades {
 
 							try {
 								MapLoaded();
+								CurrentDemo.start_time = saved_start_time - CurrentDemo.delta_time;
 							} catch (const std::exception &ex) {
 								tryMapLoadOnPacketType = false;
 								if (strstr(ex.what(), "File truncated") ||
