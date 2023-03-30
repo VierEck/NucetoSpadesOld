@@ -398,6 +398,9 @@ namespace spades {
 			DemoStop();
 		}
 
+		struct Demo CurrentDemo;
+		struct Demo ResetStruct;
+
 		void NetClient::Connect(const ServerAddress &hostname) {
 			SPADES_MARK_FUNCTION();
 
@@ -1859,6 +1862,10 @@ namespace spades {
 
 		void NetClient::MapLoaded() {
 			SPADES_MARK_FUNCTION();
+			if (client->Replaying && DemoSkippingMap && DemoSkipTime == 0) {
+				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time;
+				DemoSkippingMap = false;
+			}
 			MemoryStream compressed(mapData.data(), mapData.size());
 			DeflateStream inflate(&compressed, CompressModeDecompress, false);
 			GameMap *map;
@@ -1910,10 +1917,6 @@ namespace spades {
 				sw.Reset();
 			}
 		}
-
-		//from sByte: https://github.com/xtreme8000/BetterSpades/commit/1f7fd9169dd33647a1f4515c453cc65fec45dc54
-		struct Demo CurrentDemo;
-		struct Demo ResetStruct;
 	
 		FILE* NetClient::HandleDemoFile(std::string file_name, bool replay) {
 			FILE* file;
@@ -1985,6 +1988,8 @@ namespace spades {
 			CurrentDemo.start_time = client->GetTimeGlobal();
 			CurrentDemo.delta_time = 0.0f;
 			DemoStarted = !replay;
+			DemoSkippingMap = false;
+			DemoSkipTime = 0;
 		}
 
 		void NetClient::DemoStop() {
@@ -2083,7 +2088,8 @@ namespace spades {
 						return;
 					}
 				}
-				CurrentDemo.start_time -= std::stoi(command);
+				DemoSkipTime = std::stoi(command);
+				CurrentDemo.start_time -= DemoSkipTime;
 				return;
 			}
 
@@ -2129,14 +2135,17 @@ namespace spades {
 			if (CurrentDemo.pause_time != 0)
 				return;
 
-			float saved_start_time;
-			while (CurrentDemo.start_time + CurrentDemo.delta_time <= client->GetTimeGlobal()) {
+			while (CurrentDemo.start_time + CurrentDemo.delta_time < client->GetTimeGlobal()) {
 				try {
 					ReadNextDemoPacket();
 				} catch (...) {
 					throw;
 				}
 				NetPacketReader reader(CurrentDemo.data);
+
+				if (DemoSkipTime != 0 && CurrentDemo.start_time + CurrentDemo.delta_time >= client->GetTimeGlobal()) {
+					DemoSkipTime = 0;
+				}
 
 				if (status == NetClientStatusConnecting) {
 					if (reader.GetType() != PacketTypeMapStart) {
@@ -2148,8 +2157,10 @@ namespace spades {
 					statusString = _Tr("Demo Replay", "Loading snapshot");
 					timeToTryMapLoad = 30;
 					tryMapLoadOnPacketType = true;
-					saved_start_time = CurrentDemo.start_time;
-					CurrentDemo.start_time = -60; //maptransfer cant be longer than a minute or so i hope. 
+					if (!DemoSkippingMap && DemoSkipTime == 0) {
+						CurrentDemo.start_time -= 300; //maptransfer cant be longer than 5 minutes. this is more than generous.
+						DemoSkippingMap = true;
+					}
 				} else if (status == NetClientStatusReceivingMap) {
 					if (reader.GetType() == PacketTypeMapChunk) {
 						std::vector<char> dt = reader.GetData();
@@ -2164,7 +2175,6 @@ namespace spades {
 						if (mapSize == mapData.size()) {
 							status = NetClientStatusConnected;
 							statusString = _Tr("Demo Replay", "Connected");
-							CurrentDemo.start_time = saved_start_time - CurrentDemo.delta_time;
 
 							try {
 								MapLoaded();
@@ -2177,6 +2187,10 @@ namespace spades {
 									// hack: more data to load...
 									status = NetClientStatusReceivingMap;
 									statusString = _Tr("Demo Replay", "Still loading...");
+									if (!DemoSkippingMap && DemoSkipTime == 0) {
+										CurrentDemo.start_time -= 300;
+										DemoSkippingMap = true;
+									}
 								} else {
 									DemoStop();
 									statusString = _Tr("Demo Replay", "Error");
@@ -2203,7 +2217,6 @@ namespace spades {
 
 							try {
 								MapLoaded();
-								CurrentDemo.start_time = saved_start_time - CurrentDemo.delta_time;
 							} catch (const std::exception &ex) {
 								tryMapLoadOnPacketType = false;
 								if (strstr(ex.what(), "File truncated") ||
@@ -2215,6 +2228,10 @@ namespace spades {
 									// hack: more data to load...
 									status = NetClientStatusReceivingMap;
 									statusString = _Tr("Demo Replay", "Still loading...");
+									if (!DemoSkippingMap && DemoSkipTime == 0) {
+										CurrentDemo.start_time -= 300;
+										DemoSkippingMap = true;
+									}
 									goto stillLoading;
 								} else {
 									DemoStop();
@@ -2236,13 +2253,50 @@ namespace spades {
 			 		try {
 						HandleGamePacket(reader);
 						if (reader.GetType() == PacketTypeMapStart) {
-							CurrentDemo.start_time = -60;
+							if (!DemoSkippingMap && DemoSkipTime == 0) {
+								CurrentDemo.start_time -= 300;
+								DemoSkippingMap = true;
+							}
 						}
 					} catch (const std::exception &ex) {
 						int type = reader.GetType();
 						reader.DumpDebug();
 						SPRaise("Exception while handling packet type 0x%08x:\n%s", type,
 						        ex.what());
+					}
+				}
+			}
+			if (status == NetClientStatusReceivingMap) {
+				if (timeToTryMapLoad > 0) {
+					timeToTryMapLoad--;
+					if (timeToTryMapLoad == 0) {
+						try {
+							MapLoaded();
+						} catch (const std::exception &ex) {
+							if ((strstr(ex.what(), "File truncated") ||
+							     strstr(ex.what(), "EOF reached")) &&
+							    savedPackets.size() < 400) {
+								// hack: more data to load...
+								SPLog(
+								  "Map decoder returned error. Maybe we will get more data...:\n%s",
+								  ex.what());
+								status = NetClientStatusReceivingMap;
+								statusString = _Tr("Demo Replay", "Still loading...");
+								timeToTryMapLoad = 200;
+								if (!DemoSkippingMap && DemoSkipTime == 0) {
+									CurrentDemo.start_time -= 300;
+									DemoSkippingMap = true;
+								}
+							} else {
+								DemoStop();
+								statusString = _Tr("Demo Replay", "Error");
+								throw;
+							}
+						} catch (...) {
+							DemoStop();
+							statusString = _Tr("Demo Replay", "Error");
+							throw;
+						}
 					}
 				}
 			}
