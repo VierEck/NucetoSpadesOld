@@ -1862,10 +1862,6 @@ namespace spades {
 
 		void NetClient::MapLoaded() {
 			SPADES_MARK_FUNCTION();
-			if (client->Replaying && DemoSkippingMap && DemoSkipTime == 0) {
-				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time;
-				DemoSkippingMap = false;
-			}
 			MemoryStream compressed(mapData.data(), mapData.size());
 			DeflateStream inflate(&compressed, CompressModeDecompress, false);
 			GameMap *map;
@@ -2013,6 +2009,10 @@ namespace spades {
 			NetPacketReader read(wri.CreatePacket());
 
 			HandleGamePacket(read);
+			if (client->Replaying && DemoSkippingMap && DemoSkipTime == 0) {
+				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time;
+				DemoSkippingMap = false;
+			}
 		}
 
 		void NetClient::DemoCommands(std::string command) {
