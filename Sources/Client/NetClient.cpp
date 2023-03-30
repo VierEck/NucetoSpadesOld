@@ -2074,7 +2074,15 @@ namespace spades {
 			}
 
 			if (command.find( "ff ", 0 ) == 0) {//fastforward
+				if ((int)command.size() <= 3)
+					return;
+				
 				command = command.substr(3, (int)command.size());
+				for (int i = 0; i < (int)command.size(); i++) {
+					if (!isdigit(command[i])) {
+						return;
+					}
+				}
 				CurrentDemo.start_time -= std::stoi(command);
 				return;
 			}
