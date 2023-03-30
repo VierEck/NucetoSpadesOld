@@ -2018,81 +2018,111 @@ namespace spades {
 		void NetClient::DemoCommands(std::string command) {
 
 			if (command == "pause" && CurrentDemo.pause_time == 0) {
-				CurrentDemo.pause_time = client->GetTimeGlobal();
-				for (int i = 0; i < GetWorld()->GetNumPlayerSlots(); i++) {
-						auto *player = GetPlayerOrNull(i);
-						if (!player)
-							continue;
-						if (player->IsSpectator())
-							continue;
-
-						CurrentDemo.oldInp.clear();
-						CurrentDemo.oldweap.clear();
-
-						CurrentDemo.oldInp.push_back(player->GetInput());
-						PlayerInput inp;
-						inp.moveForward  = 0;
-						inp.moveBackward = 0;
-						inp.moveLeft     = 0;
-						inp.moveRight    = 0,
-						inp.jump         = 0;
-						if (player->GetInput().crouch) {
-							inp.crouch   = 1;
-						} else {
-							inp.crouch   = 0;
-						}
-						inp.sneak        = 0;
-						inp.sprint       = 0;
-						player->SetInput(inp);
-
-						CurrentDemo.oldweap.push_back(player->GetWeaponInput());
-						WeaponInput winp;
-						winp.primary = 0;
-						if (player->GetTool() == Player::ToolWeapon) {
-							winp.secondary = player->GetWeaponInput().secondary;
-						} else {
-							winp.secondary = 0;
-						}
-						player->SetWeaponInput(winp);
-
-				}
+				DemoCommandPause();
 				return;
 			}
-
 			if (command == "unpause" && CurrentDemo.pause_time != 0) {
-				CurrentDemo.start_time += client->GetTimeGlobal() - CurrentDemo.pause_time;
-				CurrentDemo.pause_time = 0;
-				int index = 0;
-				for (int i = 0; i < GetWorld()->GetNumPlayerSlots(); i++) {
-						auto *player = GetPlayerOrNull(i);
-						if (!player)
-							continue;
-						if (player->IsSpectator())
-							continue;
-
-						player->SetInput(CurrentDemo.oldInp[index]);
-						player->SetWeaponInput(CurrentDemo.oldweap[index]);
-
-						index++;
-				}
+				DemoCommandUnpause();
 				return;
 			}
-
 			if (command.find( "ff ", 0 ) == 0) {//fastforward
-				if ((int)command.size() <= 3)
-					return;
-				
-				command = command.substr(3, (int)command.size());
-				for (int i = 0; i < (int)command.size(); i++) {
-					if (!isdigit(command[i])) {
-						return;
-					}
-				}
-				DemoSkipTime = std::stoi(command);
-				CurrentDemo.start_time -= DemoSkipTime;
+				DemoCommandFF(command);
+				return;
+			}
+			if (command.find( "bb ", 0 ) == 0) {//rewind. actually starts all over again and fastforwards to time where u want to rewind to lol
+				DemoCommandBB(command);
 				return;
 			}
 
+		}
+
+		void NetClient::DemoCommandPause() {
+			CurrentDemo.pause_time = client->GetTimeGlobal();
+			for (int i = 0; i < GetWorld()->GetNumPlayerSlots(); i++) {
+				auto *player = GetPlayerOrNull(i);
+				if (!player)
+					continue;
+				if (player->IsSpectator())
+					continue;
+
+				CurrentDemo.oldInp.clear();
+				CurrentDemo.oldweap.clear();
+
+				CurrentDemo.oldInp.push_back(player->GetInput());
+				PlayerInput inp;
+				inp.moveForward  = 0;
+				inp.moveBackward = 0;
+				inp.moveLeft     = 0;
+				inp.moveRight    = 0,
+				inp.jump         = 0;
+				if (player->GetInput().crouch) {
+					inp.crouch   = 1;
+				} else {
+					inp.crouch   = 0;
+				}
+				inp.sneak        = 0;
+				inp.sprint       = 0;
+				player->SetInput(inp);
+
+				CurrentDemo.oldweap.push_back(player->GetWeaponInput());
+				WeaponInput winp;
+				winp.primary = 0;
+				if (player->GetTool() == Player::ToolWeapon) {
+					winp.secondary = player->GetWeaponInput().secondary;
+				} else {
+					winp.secondary = 0;
+				}
+				player->SetWeaponInput(winp);
+			}
+		}
+
+		void NetClient::DemoCommandUnpause() {
+			CurrentDemo.start_time += client->GetTimeGlobal() - CurrentDemo.pause_time;
+			CurrentDemo.pause_time = 0;
+			int index = 0;
+			for (int i = 0; i < GetWorld()->GetNumPlayerSlots(); i++) {
+				auto *player = GetPlayerOrNull(i);
+				if (!player)
+					continue;
+				if (player->IsSpectator())
+					continue;
+
+				player->SetInput(CurrentDemo.oldInp[index]);
+				player->SetWeaponInput(CurrentDemo.oldweap[index]);
+
+				index++;
+			}
+		}
+
+		void NetClient::DemoCommandFF(std::string seconds) {
+			if ((int)seconds.size() <= 3)
+				return;
+				
+			seconds = seconds.substr(3, (int)seconds.size());
+			for (int i = 0; i < (int)seconds.size(); i++) {
+				if (!isdigit(seconds[i])) {
+					return;
+				}
+			}
+			DemoSkipTime = std::stoi(seconds);
+			CurrentDemo.start_time -= DemoSkipTime;
+		}
+
+		void NetClient::DemoCommandBB(std::string seconds) {
+			if ((int)seconds.size() <= 3)
+				return;
+				
+			seconds = seconds.substr(3, (int)seconds.size());
+			for (int i = 0; i < (int)seconds.size(); i++) {
+				if (!isdigit(seconds[i])) {
+					return;
+				}
+			}
+			if (fseek(CurrentDemo.fp, 2L, SEEK_SET) == 0) {
+				DemoSkipTime = std::stoi(seconds);
+				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time + DemoSkipTime;
+				CurrentDemo.delta_time = 0;
+			}
 		}
 
 		int NetClient::GetDemoTimer() {
@@ -2132,7 +2162,7 @@ namespace spades {
 			if (CurrentDemo.start_time + CurrentDemo.delta_time > client->GetTimeGlobal() || status == NetClientStatusNotConnected)
 				return;
 
-			if (CurrentDemo.pause_time != 0)
+			if (CurrentDemo.pause_time != 0 && DemoSkipTime == 0)
 				return;
 
 			while (CurrentDemo.start_time + CurrentDemo.delta_time < client->GetTimeGlobal()) {
@@ -2145,6 +2175,9 @@ namespace spades {
 
 				if (DemoSkipTime != 0 && CurrentDemo.start_time + CurrentDemo.delta_time >= client->GetTimeGlobal()) {
 					DemoSkipTime = 0;
+					if (CurrentDemo.pause_time != 0) {
+						DemoCommandPause();
+					}
 				}
 
 				if (status == NetClientStatusConnecting) {

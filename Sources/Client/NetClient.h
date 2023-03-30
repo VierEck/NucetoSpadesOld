@@ -175,6 +175,10 @@ namespace spades {
 			float DemoSkipTime;
 
 			void DemoCommands(std::string command);
+			void DemoCommandPause();
+			void DemoCommandUnpause();
+			void DemoCommandFF(std::string seconds);
+			void DemoCommandBB(std::string seconds);
 		};
 		struct Demo {
 			FILE* fp;
