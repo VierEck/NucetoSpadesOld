@@ -170,6 +170,7 @@ namespace spades {
 			void joinReplay();
 			void ReadNextDemoPacket();
 			void DoDemo();
+			int GetDemoTimer();
 
 			void DemoCommands(std::string command);
 		};

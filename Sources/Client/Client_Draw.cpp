@@ -1262,7 +1262,18 @@ namespace spades {
 			r->SetColorAlphaPremultiplied(Vector4(0.f, 0.f, 0.f, 0.5f));
 			r->DrawImage(nullptr, AABB2(pos.x, pos.y, size.x, size.y));
 			font->DrawShadow(str, pos + Vector2(margin, margin), 1.f, Vector4(1.f, 1.f, 1.f, a), Vector4(0.f, 0.f, 0.f, a2));
-			
+
+			if (Replaying) {
+				sprintf(buf, "Demo Time: %i", net->GetDemoTimer());
+				str = buf;
+				auto tsize = font->Measure(str);
+				tsize += Vector2(margin * 2.f, margin * 2.f);
+				auto tpos = (Vector2(scrWidth, scrHeight) - tsize) * Vector2(0.5f, 0.95f);
+				r->SetColorAlphaPremultiplied(Vector4(0.f, 0.f, 0.f, 0.5f));
+				r->DrawImage(nullptr, AABB2(tpos.x, tpos.y, tsize.x, tsize.y));
+				font->DrawShadow(str, tpos + Vector2(margin, margin), 1.f, Vector4(1.f, 1.f, 1.f, a), Vector4(0.f, 0.f, 0.f, a2));
+			}
+
 			if (n_StatsColor && !Replaying){
 			
 			//fps

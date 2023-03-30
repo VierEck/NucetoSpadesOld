@@ -2089,6 +2089,10 @@ namespace spades {
 
 		}
 
+		int NetClient::GetDemoTimer() {
+			return CurrentDemo.delta_time;
+		}
+
 		void NetClient::ReadNextDemoPacket() {
 			if (!CurrentDemo.fp)
 				return;
@@ -2231,6 +2235,9 @@ namespace spades {
 				}  else if (status == NetClientStatusConnected) {
 			 		try {
 						HandleGamePacket(reader);
+						if (reader.GetType() == PacketTypeMapStart) {
+							CurrentDemo.start_time = -60;
+						}
 					} catch (const std::exception &ex) {
 						int type = reader.GetType();
 						reader.DumpDebug();
