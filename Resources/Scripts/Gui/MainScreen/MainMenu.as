@@ -525,6 +525,7 @@ namespace spades {
 				return;
 			}
 			string DemoFile = ""; 
+			string FieldText = addressField.Text;
 			if (Replay) {
 				bool Found = false; 
 				for(int i = 0, count = savedlist.length; i < count; i++) {
@@ -537,10 +538,10 @@ namespace spades {
 				if (!Found) {
 					return;
 				}
-				DemoFile = "Demos/" + addressField.Text; //test
-				addressField.Text = "aos://16777343:32887";
+				DemoFile = "Demos/" + addressField.Text;
+				FieldText = "aos://16777343:32887";
 			}
-            string msg = helper.ConnectServer(addressField.Text, cg_protocolVersion.IntValue, Replay, DemoFile);
+            string msg = helper.ConnectServer(FieldText, cg_protocolVersion.IntValue, Replay, DemoFile);
             if(msg.length > 0) {
                 // failde to initialize client.
                 AlertScreen al(this, msg);
