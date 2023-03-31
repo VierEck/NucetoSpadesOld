@@ -181,6 +181,12 @@ namespace spades {
 			void DemoCommandUnpause(bool commanded);
 			void DemoCommandFF(std::string seconds);
 			void DemoCommandBB(std::string seconds);
+			std::pair<int, bool> DemoFollowState;
+			void DemoCommandNextUps(std::string ups);
+			int demo_next_ups;
+			int demo_count_ups;
+			bool PrevUps;
+			void DemoCommandPrevUps(std::string ups);
 		};
 		struct Demo {
 			FILE* fp;
