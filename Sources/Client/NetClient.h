@@ -172,11 +172,13 @@ namespace spades {
 			void DoDemo();
 			bool DemoSkippingMap;
 			int GetDemoTimer();
-			float DemoSkipTime;
+			float demo_skip_time;
 
 			void DemoCommands(std::string command);
 			void DemoCommandPause();
-			void DemoCommandUnpause();
+			float demo_pause_time;
+			bool PauseDemo;
+			void DemoCommandUnpause(bool commanded);
 			void DemoCommandFF(std::string seconds);
 			void DemoCommandBB(std::string seconds);
 		};
@@ -184,10 +186,7 @@ namespace spades {
 			FILE* fp;
 			float start_time;
 			float delta_time;
-			float pause_time;
 			std::vector<char> data;
-			std::vector<PlayerInput> oldInp;
-			std::vector<WeaponInput> oldweap;
 		};
 	}
 }

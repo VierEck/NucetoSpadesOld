@@ -1984,8 +1984,8 @@ namespace spades {
 			CurrentDemo.start_time = client->GetTimeGlobal();
 			CurrentDemo.delta_time = 0.0f;
 			DemoStarted = !replay;
-			DemoSkippingMap = false;
-			DemoSkipTime = 0;
+			DemoSkippingMap = PauseDemo = false;
+			demo_skip_time = demo_pause_time = 0;
 		}
 
 		void NetClient::DemoStop() {
@@ -2009,7 +2009,7 @@ namespace spades {
 			NetPacketReader read(wri.CreatePacket());
 
 			HandleGamePacket(read);
-			if (client->Replaying && DemoSkippingMap && DemoSkipTime == 0) {
+			if (client->Replaying && DemoSkippingMap && demo_skip_time == 0) {
 				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time;
 				DemoSkippingMap = false;
 			}
@@ -2017,12 +2017,12 @@ namespace spades {
 
 		void NetClient::DemoCommands(std::string command) {
 
-			if (command == "pause" && CurrentDemo.pause_time == 0) {
+			if (command == "pause" && demo_pause_time == 0) {
 				DemoCommandPause();
 				return;
 			}
-			if (command == "unpause" && CurrentDemo.pause_time != 0) {
-				DemoCommandUnpause();
+			if (command == "unpause" && demo_pause_time != 0) {
+				DemoCommandUnpause(true);
 				return;
 			}
 			if (command.find( "ff ", 0 ) == 0) {//fastforward
@@ -2037,60 +2037,15 @@ namespace spades {
 		}
 
 		void NetClient::DemoCommandPause() {
-			CurrentDemo.pause_time = client->GetTimeGlobal();
-			for (int i = 0; i < GetWorld()->GetNumPlayerSlots(); i++) {
-				auto *player = GetPlayerOrNull(i);
-				if (!player)
-					continue;
-				if (player->IsSpectator())
-					continue;
-
-				CurrentDemo.oldInp.clear();
-				CurrentDemo.oldweap.clear();
-
-				CurrentDemo.oldInp.push_back(player->GetInput());
-				PlayerInput inp;
-				inp.moveForward  = 0;
-				inp.moveBackward = 0;
-				inp.moveLeft     = 0;
-				inp.moveRight    = 0,
-				inp.jump         = 0;
-				if (player->GetInput().crouch) {
-					inp.crouch   = 1;
-				} else {
-					inp.crouch   = 0;
-				}
-				inp.sneak        = 0;
-				inp.sprint       = 0;
-				player->SetInput(inp);
-
-				CurrentDemo.oldweap.push_back(player->GetWeaponInput());
-				WeaponInput winp;
-				winp.primary = 0;
-				if (player->GetTool() == Player::ToolWeapon) {
-					winp.secondary = player->GetWeaponInput().secondary;
-				} else {
-					winp.secondary = 0;
-				}
-				player->SetWeaponInput(winp);
-			}
+			demo_pause_time = client->GetTimeGlobal();
+			PauseDemo = true;
 		}
 
-		void NetClient::DemoCommandUnpause() {
-			CurrentDemo.start_time += client->GetTimeGlobal() - CurrentDemo.pause_time;
-			CurrentDemo.pause_time = 0;
-			int index = 0;
-			for (int i = 0; i < GetWorld()->GetNumPlayerSlots(); i++) {
-				auto *player = GetPlayerOrNull(i);
-				if (!player)
-					continue;
-				if (player->IsSpectator())
-					continue;
-
-				player->SetInput(CurrentDemo.oldInp[index]);
-				player->SetWeaponInput(CurrentDemo.oldweap[index]);
-
-				index++;
+		void NetClient::DemoCommandUnpause(bool commanded) {
+			CurrentDemo.start_time += client->GetTimeGlobal() - demo_pause_time;
+			demo_pause_time = 0;
+			if (commanded) {
+				PauseDemo = false;
 			}
 		}
 
@@ -2104,8 +2059,11 @@ namespace spades {
 					return;
 				}
 			}
-			DemoSkipTime = std::stoi(seconds);
-			CurrentDemo.start_time -= DemoSkipTime;
+			if (PauseDemo) {
+				DemoCommandUnpause(false);
+			}
+			demo_skip_time = std::stoi(seconds);
+			CurrentDemo.start_time -= demo_skip_time;
 		}
 
 		void NetClient::DemoCommandBB(std::string seconds) {
@@ -2119,8 +2077,11 @@ namespace spades {
 				}
 			}
 			if (fseek(CurrentDemo.fp, 2L, SEEK_SET) == 0) {
-				DemoSkipTime = std::stoi(seconds);
-				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time + DemoSkipTime;
+				if (PauseDemo) {
+					DemoCommandUnpause(false);
+				}
+				demo_skip_time = std::stoi(seconds);
+				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time + demo_skip_time;
 				CurrentDemo.delta_time = 0;
 			}
 		}
@@ -2159,11 +2120,18 @@ namespace spades {
 		}
 
 		void NetClient::DoDemo() {
-			if (CurrentDemo.start_time + CurrentDemo.delta_time > client->GetTimeGlobal() || status == NetClientStatusNotConnected)
+			if (status == NetClientStatusNotConnected)
 				return;
 
-			if (CurrentDemo.pause_time != 0 && DemoSkipTime == 0)
+			if (demo_pause_time != 0 && demo_skip_time == 0)
 				return;
+
+			if (demo_skip_time != 0 && CurrentDemo.start_time + CurrentDemo.delta_time >= client->GetTimeGlobal()) {
+				demo_skip_time = 0;
+				if (PauseDemo) {
+					DemoCommandPause();
+				}
+			}
 
 			while (CurrentDemo.start_time + CurrentDemo.delta_time < client->GetTimeGlobal()) {
 				try {
@@ -2172,13 +2140,6 @@ namespace spades {
 					throw;
 				}
 				NetPacketReader reader(CurrentDemo.data);
-
-				if (DemoSkipTime != 0 && CurrentDemo.start_time + CurrentDemo.delta_time >= client->GetTimeGlobal()) {
-					DemoSkipTime = 0;
-					if (CurrentDemo.pause_time != 0) {
-						DemoCommandPause();
-					}
-				}
 
 				if (status == NetClientStatusConnecting) {
 					if (reader.GetType() != PacketTypeMapStart) {
@@ -2190,7 +2151,7 @@ namespace spades {
 					statusString = _Tr("Demo Replay", "Loading snapshot");
 					timeToTryMapLoad = 30;
 					tryMapLoadOnPacketType = true;
-					if (!DemoSkippingMap && DemoSkipTime == 0) {
+					if (!DemoSkippingMap && demo_skip_time == 0) {
 						CurrentDemo.start_time -= 300; //maptransfer cant be longer than 5 minutes. this is more than generous.
 						DemoSkippingMap = true;
 					}
@@ -2220,7 +2181,7 @@ namespace spades {
 									// hack: more data to load...
 									status = NetClientStatusReceivingMap;
 									statusString = _Tr("Demo Replay", "Still loading...");
-									if (!DemoSkippingMap && DemoSkipTime == 0) {
+									if (!DemoSkippingMap && demo_skip_time == 0) {
 										CurrentDemo.start_time -= 300;
 										DemoSkippingMap = true;
 									}
@@ -2261,7 +2222,7 @@ namespace spades {
 									// hack: more data to load...
 									status = NetClientStatusReceivingMap;
 									statusString = _Tr("Demo Replay", "Still loading...");
-									if (!DemoSkippingMap && DemoSkipTime == 0) {
+									if (!DemoSkippingMap && demo_skip_time == 0) {
 										CurrentDemo.start_time -= 300;
 										DemoSkippingMap = true;
 									}
@@ -2286,7 +2247,7 @@ namespace spades {
 			 		try {
 						HandleGamePacket(reader);
 						if (reader.GetType() == PacketTypeMapStart) {
-							if (!DemoSkippingMap && DemoSkipTime == 0) {
+							if (!DemoSkippingMap && demo_skip_time == 0) {
 								CurrentDemo.start_time -= 300;
 								DemoSkippingMap = true;
 							}
@@ -2316,7 +2277,7 @@ namespace spades {
 								status = NetClientStatusReceivingMap;
 								statusString = _Tr("Demo Replay", "Still loading...");
 								timeToTryMapLoad = 200;
-								if (!DemoSkippingMap && DemoSkipTime == 0) {
+								if (!DemoSkippingMap && demo_skip_time == 0) {
 									CurrentDemo.start_time -= 300;
 									DemoSkippingMap = true;
 								}
