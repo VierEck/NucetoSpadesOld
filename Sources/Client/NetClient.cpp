@@ -2067,6 +2067,10 @@ namespace spades {
 				DemoCommandBB(command);
 				return;
 			}
+			if (command.find( "gt ", 0 ) == 0) {//GoTo. set demo time. 
+				DemoCommandGT(command);
+				return;
+			}
 		}
 
 		void NetClient::DemoCommandPause() {
@@ -2083,21 +2087,12 @@ namespace spades {
 		}
 
 		void NetClient::DemoCommandFF(std::string seconds) {
-			if ((int)seconds.size() <= 3)
+			demo_skip_time = DemoStringToInt(seconds);
+			if (demo_skip_time == 0 || demo_skip_time == -1) {
 				return;
-				
-			seconds = seconds.substr(3, (int)seconds.size());
-			for (int i = 0; i < (int)seconds.size(); i++) {
-				if (!isdigit(seconds[i])) {
-					return;
-				}
 			}
 			if (PauseDemo) {
 				DemoCommandUnpause(false);
-			}
-			demo_skip_time = std::stoi(seconds);
-			if (demo_skip_time == 0) {
-				return;
 			}
 			CurrentDemo.start_time -= demo_skip_time;
 			DemoFollowState.first = client->GetFollowedPlayerId();
@@ -2105,42 +2100,50 @@ namespace spades {
 		}
 
 		void NetClient::DemoCommandBB(std::string seconds) {
-			if ((int)seconds.size() <= 3)
-				return;
-				
-			seconds = seconds.substr(3, (int)seconds.size());
-			for (int i = 0; i < (int)seconds.size(); i++) {
-				if (!isdigit(seconds[i])) {
+			if (fseek(CurrentDemo.fp, 2L, SEEK_SET) == 0) {
+				demo_skip_time = DemoStringToInt(seconds);
+				if (demo_skip_time == 0 || demo_skip_time == -1) {
 					return;
 				}
-			}
-			if (fseek(CurrentDemo.fp, 2L, SEEK_SET) == 0) {
 				if (PauseDemo) {
 					DemoCommandUnpause(false);
 				}
-				demo_skip_time = std::stoi(seconds);
-				if (demo_skip_time == 0) {
-					return;
-				}
-				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time + demo_skip_time + 0.5;
+				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time + demo_skip_time;
 				CurrentDemo.delta_time = demo_count_ups = 0;
 				DemoFollowState.first = client->GetFollowedPlayerId();
 				DemoFollowState.second = client->GetFollowMode();
 			}
 		}
 
-		void NetClient::DemoCommandNextUps(std::string ups) {
-			if ((int)ups.size() <= 3)
+		void NetClient::DemoCommandGT(std::string delta) {
+			demo_skip_time = DemoStringToInt(delta);
+			if (demo_skip_time == -1) {
 				return;
+			}
+			if (demo_skip_time > CurrentDemo.delta_time) {
+				DemoCommandFF("ff " + std::to_string((demo_skip_time - (int)CurrentDemo.delta_time)));
+			}
+			else if (demo_skip_time < CurrentDemo.delta_time) {
+				DemoCommandBB("bb " + std::to_string(((int)CurrentDemo.delta_time - demo_skip_time)));
+			}
+		}
+
+		int NetClient::DemoStringToInt(std::string seconds) {
+			if ((int)seconds.size() <= 3)
+				return -1;
 				
-			ups = ups.substr(3, (int)ups.size());
-			for (int i = 0; i < (int)ups.size(); i++) {
-				if (!isdigit(ups[i])) {
-					return;
+			seconds = seconds.substr(3, (int)seconds.size());
+			for (int i = 0; i < (int)seconds.size(); i++) {
+				if (!isdigit(seconds[i])) {
+					return -1;
 				}
 			}
-			demo_next_ups = std::stoi(ups);
-			if (demo_next_ups == 0) {
+			return std::stoi(seconds);
+		}
+
+		void NetClient::DemoCommandNextUps(std::string ups) {
+			demo_next_ups = DemoStringToInt(ups);
+			if (demo_next_ups == 0 || demo_next_ups == -1) {
 				return;
 			}
 			DemoCommandUnpause(false);
@@ -2151,20 +2154,12 @@ namespace spades {
 		}
 
 		void NetClient::DemoCommandPrevUps(std::string ups) {
-			if ((int)ups.size() <= 3)
-				return;
-				
-			ups = ups.substr(3, (int)ups.size());
-			for (int i = 0; i < (int)ups.size(); i++) {
-				if (!isdigit(ups[i])) {
-					return;
-				}
-			}
 			if (fseek(CurrentDemo.fp, 2L, SEEK_SET) == 0) {
-				if (std::stoi(ups) == 0) {
+				int rewindups = DemoStringToInt(ups);
+				if (rewindups == 0 || rewindups == -1) {
 					return;
 				}
-				demo_next_ups = demo_count_ups - std::stoi(ups);
+				demo_next_ups = demo_count_ups - rewindups;
 				DemoCommandUnpause(false);
 				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time;
 				CurrentDemo.delta_time = demo_count_ups = 0;

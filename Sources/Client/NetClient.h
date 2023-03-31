@@ -172,7 +172,7 @@ namespace spades {
 			void DoDemo();
 			bool DemoSkippingMap;
 			int GetDemoTimer();
-			float demo_skip_time;
+			int demo_skip_time;
 
 			void DemoCommands(std::string command);
 			void DemoCommandPause();
@@ -181,6 +181,8 @@ namespace spades {
 			void DemoCommandUnpause(bool commanded);
 			void DemoCommandFF(std::string seconds);
 			void DemoCommandBB(std::string seconds);
+			void DemoCommandGT(std::string delta);
+			int DemoStringToInt(std::string seconds);
 			std::pair<int, bool> DemoFollowState;
 			void DemoCommandNextUps(std::string ups);
 			int demo_next_ups;
