@@ -130,7 +130,7 @@ namespace spades {
 			Player *p = world->GetLocalPlayer();
 			if (!p)
 				return;
-			if (!p->IsAlive())
+			if (!p->IsAlive() || p->IsSpectator())
 				return;
 
 			IntVector3 outBlockCoord;
@@ -206,7 +206,7 @@ namespace spades {
 
 				float frameStep = 1.f / 60.f;
 				while (worldSubFrame >= frameStep) {
-					world->Advance(frameStep);
+					world->Advance(frameStep * DemoSpeedMultiplier);
 					worldSubFrame -= frameStep;
 				}
 			}

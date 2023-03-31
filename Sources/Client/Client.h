@@ -499,6 +499,7 @@ namespace spades {
 			int GetFollowedPlayerId() { return followedPlayerId; }
 			bool GetFollowMode() { return followCameraState.enabled; }
 			void SetFollowMode(bool enable) { followCameraState.enabled = enable; }
+			float DemoSpeedMultiplier;
 		};
 	}
 }

@@ -104,6 +104,7 @@ namespace spades {
 
 			  Replaying(replay),
 			  demo_file(demo_name),
+			  DemoSpeedMultiplier(1),
 
 		      worldSubFrame(0.f),
 		      frameToRendererInit(5),

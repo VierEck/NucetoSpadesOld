@@ -179,16 +179,17 @@ namespace spades {
 			float demo_pause_time;
 			bool PauseDemo;
 			void DemoCommandUnpause(bool commanded);
-			void DemoCommandFF(std::string seconds);
-			void DemoCommandBB(std::string seconds);
-			void DemoCommandGT(std::string delta);
-			int DemoStringToInt(std::string seconds);
+			void DemoCommandFF(int seconds);
+			void DemoCommandBB(int seconds);
+			void DemoCommandGT(int delta);
+			void DemoCommandSP(float speed);
+			int DemoStringToInt(std::string integer);
 			std::pair<int, bool> DemoFollowState;
-			void DemoCommandNextUps(std::string ups);
+			void DemoCommandNextUps(int ups);
 			int demo_next_ups;
 			int demo_count_ups;
 			bool PrevUps;
-			void DemoCommandPrevUps(std::string ups);
+			void DemoCommandPrevUps(int ups);
 		};
 		struct Demo {
 			FILE* fp;

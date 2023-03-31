@@ -2051,26 +2051,56 @@ namespace spades {
 				DemoCommandUnpause(true);
 				return;
 			}
+
+			if ((int)command.size() <= 3)
+				return;
+
+			if (command.find( "sp ", 0) == 0) {//speed. set speed of demo time (slow down or speed up the demo)
+				command = command.substr(3, (int)command.size());
+				for (int i = 0; i < (int)command.size(); i++) {
+					if (!isdigit(command[i]) && command[i] != '.') {
+						return;
+					}
+				}
+				DemoCommandSP(std::stof(command));
+				return;
+			}
+
+			int value = DemoStringToInt(command);
+			if (value == -1) {
+				return;
+			}
+
 			if (command.find( "nu ", 0 ) == 0 && demo_pause_time != 0) {//next update. advance to next amount of world updates on pause (ups, update per second)
-				DemoCommandNextUps(command);
+				DemoCommandNextUps(value);
 				return;
 			}
 			if (command.find( "pu ", 0 ) == 0 && demo_pause_time != 0) {//prev update. rewind to previous amount of world updates on pause (ups, update per second)
-				DemoCommandPrevUps(command);
+				DemoCommandPrevUps(value);
 				return;
 			}
 			if (command.find( "ff ", 0 ) == 0) {//fastforward
-				DemoCommandFF(command);
+				DemoCommandFF(value);
 				return;
 			}
 			if (command.find( "bb ", 0 ) == 0) {//rewind. actually starts all over again and fastforwards to time where u want to rewind to lol
-				DemoCommandBB(command);
+				DemoCommandBB(value);
 				return;
 			}
 			if (command.find( "gt ", 0 ) == 0) {//GoTo. set demo time. 
-				DemoCommandGT(command);
+				DemoCommandGT(value);
 				return;
 			}
+		}
+
+		int NetClient::DemoStringToInt(std::string integer) {
+			integer = integer.substr(3, (int)integer.size());
+			for (int i = 0; i < (int)integer.size(); i++) {
+				if (!isdigit(integer[i])) {
+					return -1;
+				}
+			}
+			return std::stoi(integer);
 		}
 
 		void NetClient::DemoCommandPause() {
@@ -2079,73 +2109,65 @@ namespace spades {
 		}
 
 		void NetClient::DemoCommandUnpause(bool commanded) {
-			CurrentDemo.start_time += client->GetTimeGlobal() - demo_pause_time;
+			CurrentDemo.start_time += client->GetTimeGlobal() * client->DemoSpeedMultiplier - demo_pause_time;
 			demo_pause_time = 0;
 			if (commanded) { //need to temporarily unpause during fastforward or rewind. only release pause when directly commanded.
 				PauseDemo = false;
 			}
 		}
 
-		void NetClient::DemoCommandFF(std::string seconds) {
-			demo_skip_time = DemoStringToInt(seconds);
-			if (demo_skip_time == 0 || demo_skip_time == -1) {
+		void NetClient::DemoCommandFF(int seconds) {
+			if (seconds == 0 || seconds == -1) {
 				return;
 			}
 			if (PauseDemo) {
 				DemoCommandUnpause(false);
 			}
+			demo_skip_time = seconds;
 			CurrentDemo.start_time -= demo_skip_time;
 			DemoFollowState.first = client->GetFollowedPlayerId();
 			DemoFollowState.second = client->GetFollowMode();
 		}
 
-		void NetClient::DemoCommandBB(std::string seconds) {
+		void NetClient::DemoCommandBB(int seconds) {
 			if (fseek(CurrentDemo.fp, 2L, SEEK_SET) == 0) {
-				demo_skip_time = DemoStringToInt(seconds);
-				if (demo_skip_time == 0 || demo_skip_time == -1) {
+				if (seconds == 0 || seconds == -1) {
 					return;
 				}
 				if (PauseDemo) {
 					DemoCommandUnpause(false);
 				}
-				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time + demo_skip_time;
+				demo_skip_time = seconds;
+				CurrentDemo.start_time = client->GetTimeGlobal() * client->DemoSpeedMultiplier - CurrentDemo.delta_time + demo_skip_time;
 				CurrentDemo.delta_time = demo_count_ups = 0;
 				DemoFollowState.first = client->GetFollowedPlayerId();
 				DemoFollowState.second = client->GetFollowMode();
 			}
 		}
 
-		void NetClient::DemoCommandGT(std::string delta) {
-			demo_skip_time = DemoStringToInt(delta);
-			if (demo_skip_time == -1) {
+		void NetClient::DemoCommandGT(int delta) {
+			if (delta == -1) {
 				return;
 			}
+			demo_skip_time = delta;
 			if (demo_skip_time > CurrentDemo.delta_time) {
-				DemoCommandFF("ff " + std::to_string((demo_skip_time - (int)CurrentDemo.delta_time)));
+				DemoCommandFF(demo_skip_time - (int)CurrentDemo.delta_time);
 			}
 			else if (demo_skip_time < CurrentDemo.delta_time) {
-				DemoCommandBB("bb " + std::to_string(((int)CurrentDemo.delta_time - demo_skip_time)));
+				DemoCommandBB((int)CurrentDemo.delta_time - demo_skip_time);
 			}
 		}
 
-		int NetClient::DemoStringToInt(std::string seconds) {
-			if ((int)seconds.size() <= 3)
-				return -1;
-				
-			seconds = seconds.substr(3, (int)seconds.size());
-			for (int i = 0; i < (int)seconds.size(); i++) {
-				if (!isdigit(seconds[i])) {
-					return -1;
-				}
-			}
-			return std::stoi(seconds);
+		void NetClient::DemoCommandSP(float speed) {
+			client->DemoSpeedMultiplier = speed;
+			CurrentDemo.start_time = client->GetTimeGlobal() * speed - CurrentDemo.delta_time;
 		}
 
-		void NetClient::DemoCommandNextUps(std::string ups) {
-			demo_next_ups = DemoStringToInt(ups);
-			if (demo_next_ups == 0 || demo_next_ups == -1) {
+		void NetClient::DemoCommandNextUps(int ups) {
+			if (ups == 0 || ups == -1) {
 				return;
 			}
+			demo_next_ups = ups;
 			DemoCommandUnpause(false);
 			CurrentDemo.start_time -= demo_next_ups;
 			PrevUps = false;
@@ -2153,15 +2175,14 @@ namespace spades {
 			DemoFollowState.second = client->GetFollowMode();
 		}
 
-		void NetClient::DemoCommandPrevUps(std::string ups) {
+		void NetClient::DemoCommandPrevUps(int ups) {
 			if (fseek(CurrentDemo.fp, 2L, SEEK_SET) == 0) {
-				int rewindups = DemoStringToInt(ups);
-				if (rewindups == 0 || rewindups == -1) {
+				if (ups == 0 || ups == -1) {
 					return;
 				}
-				demo_next_ups = demo_count_ups - rewindups;
+				demo_next_ups = demo_count_ups - ups;
 				DemoCommandUnpause(false);
-				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time;
+				CurrentDemo.start_time = client->GetTimeGlobal() * client->DemoSpeedMultiplier - CurrentDemo.delta_time;
 				CurrentDemo.delta_time = demo_count_ups = 0;
 				demo_skip_time = 1;
 				PrevUps = true;
@@ -2210,7 +2231,7 @@ namespace spades {
 			if (demo_pause_time != 0 && demo_skip_time == 0)
 				return;
 
-			if (demo_skip_time != 0 && CurrentDemo.start_time + CurrentDemo.delta_time >= client->GetTimeGlobal()) {
+			if (demo_skip_time != 0 && CurrentDemo.start_time + CurrentDemo.delta_time >= client->GetTimeGlobal() * client->DemoSpeedMultiplier) {
 				demo_skip_time = 0;
 				client->SetFollowedPlayerId(DemoFollowState.first);
 				client->SetFollowMode(DemoFollowState.second);
@@ -2224,7 +2245,7 @@ namespace spades {
 				}
 			}
 
-			while (CurrentDemo.start_time + CurrentDemo.delta_time < client->GetTimeGlobal()) {
+			while (CurrentDemo.start_time + CurrentDemo.delta_time < client->GetTimeGlobal() * client->DemoSpeedMultiplier) {
 				try {
 					ReadNextDemoPacket();
 				} catch (...) {
