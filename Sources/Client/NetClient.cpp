@@ -2036,6 +2036,9 @@ namespace spades {
 				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time;
 				DemoSkippingMap = false;
 			}
+			if (PauseDemo) {
+				DemoCommandPause();
+			}
 		}
 
 		void NetClient::DemoCommands(std::string command) {
@@ -2119,8 +2122,8 @@ namespace spades {
 				if (demo_skip_time == 0) {
 					return;
 				}
-				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time + demo_skip_time;
-				CurrentDemo.delta_time = 0;
+				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time + demo_skip_time + 0.5;
+				CurrentDemo.delta_time = demo_count_ups = 0;
 				DemoFollowState.first = client->GetFollowedPlayerId();
 				DemoFollowState.second = client->GetFollowMode();
 			}
@@ -2163,9 +2166,8 @@ namespace spades {
 				}
 				demo_next_ups = demo_count_ups - std::stoi(ups);
 				DemoCommandUnpause(false);
-				demo_count_ups = 0;
 				CurrentDemo.start_time = client->GetTimeGlobal() - CurrentDemo.delta_time;
-				CurrentDemo.delta_time = 0;
+				CurrentDemo.delta_time = demo_count_ups = 0;
 				demo_skip_time = 1;
 				PrevUps = true;
 				DemoFollowState.first = client->GetFollowedPlayerId();
@@ -2218,7 +2220,12 @@ namespace spades {
 				client->SetFollowedPlayerId(DemoFollowState.first);
 				client->SetFollowMode(DemoFollowState.second);
 				if (PauseDemo) {
-					DemoCommandPause();
+					if (status == NetClientStatusReceivingMap) {
+						CurrentDemo.start_time -= 300;
+						DemoSkippingMap = true;
+					} else {
+						DemoCommandPause();
+					}
 				}
 			}
 
