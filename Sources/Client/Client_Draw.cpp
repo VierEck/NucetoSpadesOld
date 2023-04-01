@@ -1264,8 +1264,12 @@ namespace spades {
 			font->DrawShadow(str, pos + Vector2(margin, margin), 1.f, Vector4(1.f, 1.f, 1.f, a), Vector4(0.f, 0.f, 0.f, a2));
 
 			if (Replaying) {
-				sprintf(buf, "Demo Time: %i", net->GetDemoTimer());
-				str = buf;
+				int currenttime = net->GetDemoTimer();
+				int hour = (int)currenttime / 3600;
+				int min  = ((int)currenttime % 3600) / 60;
+				int sec  = (int)currenttime % 60;
+				sprintf(buf, "Demo: %02d:%02d:%02d / ", hour, min, sec);
+				str = buf + net->demo_end_time;
 				auto tsize = font->Measure(str);
 				tsize += Vector2(margin * 2.f, margin * 2.f);
 				auto tpos = (Vector2(scrWidth, scrHeight) - tsize) * Vector2(0.5f, 0.95f);

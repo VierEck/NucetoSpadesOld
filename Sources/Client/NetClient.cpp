@@ -1973,6 +1973,19 @@ namespace spades {
 					}
 						
 				}
+				float end_time;
+				unsigned short len;
+				while (fread(&end_time, sizeof(end_time), 1, file) == 1) {
+					fread(&len, sizeof(len), 1, file);
+					fseek(file, len, SEEK_CUR);
+				}
+				fseek(file, 2L, SEEK_SET);
+				int hour = (int)end_time / 3600;
+				int min  = ((int)end_time % 3600) / 60;
+				int sec  = (int)end_time % 60;
+				char buf[256];
+				sprintf(buf, "%02d:%02d:%02d", hour, min, sec);
+				demo_end_time = buf;
 
 				savedPackets.clear();
 

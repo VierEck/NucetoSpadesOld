@@ -172,6 +172,7 @@ namespace spades {
 			void DoDemo();
 			bool DemoSkippingMap;
 			int GetDemoTimer();
+			std::string demo_end_time;
 			int demo_skip_time;
 
 			void DemoCommands(std::string command);
