@@ -2056,8 +2056,12 @@ namespace spades {
 
 		void NetClient::DemoCommands(std::string command) {
 
-			if (command == "pause" && demo_pause_time == 0) {
-				DemoCommandPause();
+			if (command == "pause") {
+				if (demo_pause_time == 0) {
+					DemoCommandPause();
+				} else {
+					DemoCommandUnpause(true);
+				}
 				return;
 			}
 			if (command == "unpause" && demo_pause_time != 0) {
