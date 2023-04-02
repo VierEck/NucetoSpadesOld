@@ -174,6 +174,7 @@ namespace spades {
 			int GetDemoTimer();
 			std::string demo_end_time;
 			int demo_skip_time;
+			void DemoSkipMap();
 
 			void DemoCommands(std::string command);
 			void DemoCommandPause();
@@ -182,7 +183,7 @@ namespace spades {
 			void DemoCommandUnpause(bool commanded);
 			void DemoCommandFF(int seconds);
 			void DemoCommandBB(int seconds);
-			void DemoCommandGT(int delta);
+			void DemoCommandGT(std::string delta);
 			void DemoCommandSP(float speed);
 			int DemoStringToInt(std::string integer);
 			std::pair<int, bool> DemoFollowState;
@@ -191,6 +192,7 @@ namespace spades {
 			int demo_count_ups;
 			bool PrevUps;
 			void DemoCommandPrevUps(int ups);
+			void DemoCountUps();
 		};
 		struct Demo {
 			FILE* fp;
