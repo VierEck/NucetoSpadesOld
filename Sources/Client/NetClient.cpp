@@ -2036,7 +2036,6 @@ namespace spades {
 		}
 
 		void NetClient::DemoCommands(std::string command) {
-
 			if (command == "pause") {
 				if (demo_pause_time == 0) {
 					DemoCommandPause();
@@ -2052,6 +2051,7 @@ namespace spades {
 
 			if ((int)command.size() <= 3)
 				return;
+
 			if (command.find( "sp ", 0) == 0) {//speed. set speed of demo time (slow down or speed up the demo)
 				command = command.substr(3, (int)command.size());
 				for (int i = 0; i < (int)command.size(); i++) {
@@ -2067,11 +2067,10 @@ namespace spades {
 				return;
 			}
 
-			command = command.substr(3, (int)command.size());
-			int value = DemoStringToInt(command);
-			if (value == -1) {
+			int value = DemoStringToInt(command.substr(3, (int)command.size()));
+			if (value == -1 || value == 0) 
 				return;
-			}
+			
 			if (command.find( "nu ", 0 ) == 0 && demo_pause_time != 0) {//next update. advance to next amount of world updates on pause (ups, update per second)
 				DemoCommandNextUps(value);
 				return;
@@ -2134,6 +2133,9 @@ namespace spades {
 					DemoCommandUnpause(false);
 				}
 				demo_skip_time = seconds;
+				if (CurrentDemo.delta_time - demo_skip_time < 0) {
+					demo_skip_time = CurrentDemo.delta_time;
+				}
 				CurrentDemo.start_time = client->GetTimeGlobal() * client->DemoSpeedMultiplier - CurrentDemo.delta_time + demo_skip_time;
 				CurrentDemo.delta_time = demo_count_ups = 0;
 				DemoFollowState.first = client->GetFollowedPlayerId();
@@ -2203,7 +2205,7 @@ namespace spades {
 			}
 			demo_next_ups = ups;
 			DemoCommandUnpause(false);
-			CurrentDemo.start_time -= demo_next_ups;
+			CurrentDemo.start_time -= demo_next_ups * 10;
 			PrevUps = false;
 			DemoFollowState.first = client->GetFollowedPlayerId();
 			DemoFollowState.second = client->GetFollowMode();
