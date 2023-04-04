@@ -1293,10 +1293,7 @@ namespace spades {
 								throw;
 							}
 						}
-						if (!client->Replaying || DemoFirstJoined) {
-							client->JoinedGame();
-							DemoFirstJoined = false;
-						}
+						client->JoinedGame();
 
 						if (client->Replaying)
 							joinReplay();
@@ -2036,10 +2033,7 @@ namespace spades {
 			} else if (PauseDemoAfterSkip) {
 				DemoCommandPause();
 			}
-			if (GetWorld()->GetPlayer(DemoFollowState.first)) {
-				client->SetFollowedPlayerId(DemoFollowState.first);
-				client->SetFollowMode(DemoFollowState.second);
-			}
+			DemoSetFollow();
 		}
 
 		void NetClient::DemoCommands(std::string command) {
@@ -2127,7 +2121,7 @@ namespace spades {
 			}
 			demo_skip_time = seconds;
 			CurrentDemo.start_time -= demo_skip_time;
-			demo_skip_end_time = CurrentDemo.start_time + CurrentDemo.delta_time;
+			demo_skip_end_time = CurrentDemo.start_time + CurrentDemo.delta_time + demo_skip_time;
 			DemoFollowState.first = client->GetFollowedPlayerId();
 			DemoFollowState.second = client->GetFollowMode();
 		}
@@ -2242,16 +2236,14 @@ namespace spades {
 				if (!PrevUps) {
 					demo_next_ups -= 1;
 					if (demo_next_ups <= 0) {
-						client->SetFollowedPlayerId(DemoFollowState.first);
-						client->SetFollowMode(DemoFollowState.second);
+						DemoSetFollow();
 						CurrentDemo.start_time = client->GetTimeGlobal() * client->DemoSpeedMultiplier - CurrentDemo.delta_time;
 						DemoCommandPause();
 					}
 				} else {
 					if (demo_count_ups >= demo_next_ups) {
 						demo_next_ups = demo_skip_time = 0;
-						client->SetFollowedPlayerId(DemoFollowState.first);
-						client->SetFollowMode(DemoFollowState.second);
+						DemoSetFollow();
 						CurrentDemo.start_time = client->GetTimeGlobal() * client->DemoSpeedMultiplier - CurrentDemo.delta_time;
 						DemoCommandPause();
 					}
@@ -2268,6 +2260,22 @@ namespace spades {
 				CurrentDemo.start_time -= 300; //maptransfer cant be longer than 5 minutes. this is more than generous.
 				DemoSkippingMap = true;
 			}
+		}
+
+		void NetClient::DemoSetFollow() {
+			if (!GetWorld())
+				return;
+			if (!GetWorld()->GetPlayer(DemoFollowState.first))
+				return;
+
+			Player *p = GetWorld()->GetPlayer(DemoFollowState.first);
+			if (p->IsSpectator())
+				return;
+			if (p->GetFront().GetPoweredLength() < .01f)
+				return;
+
+			client->SetFollowedPlayerId(DemoFollowState.first);
+			client->SetFollowMode(DemoFollowState.second);
 		}
 
 		void NetClient::ReadNextDemoPacket() {
@@ -2313,12 +2321,7 @@ namespace spades {
 				} else if (PauseDemoAfterSkip) {
 					DemoCommandPause();
 				}
-				if (GetWorld()) {
-						if (GetWorld()->GetPlayer(DemoFollowState.first)) {
-					client->SetFollowedPlayerId(DemoFollowState.first);
-						client->SetFollowMode(DemoFollowState.second);
-					}
-				}
+				DemoSetFollow();
 			}
 
 			while (CurrentDemo.start_time + CurrentDemo.delta_time < client->GetTimeGlobal() * client->DemoSpeedMultiplier) {

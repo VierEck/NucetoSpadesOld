@@ -62,10 +62,14 @@ namespace spades {
 		void Client::JoinedGame() {
 			// Note: A local player doesn't exist yet
 
-			// Prepare the spectate mode
-			followCameraState.enabled = false;
-			freeCameraState.position = MakeVector3(256, 256, 30);
-			freeCameraState.velocity = MakeVector3(0, 0, 0);
+			if (!Replaying || net->DemoFirstJoined) {
+				// Prepare the spectate mode
+				followCameraState.enabled = false;
+				freeCameraState.position = MakeVector3(256, 256, 30);
+				freeCameraState.velocity = MakeVector3(0, 0, 0);
+
+				net->DemoFirstJoined = false;
+			}
 
 			followedPlayerId = world->GetLocalPlayerIndex();
 		}
