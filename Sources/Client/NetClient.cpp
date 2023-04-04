@@ -2331,6 +2331,12 @@ namespace spades {
 					throw;
 				}
 				NetPacketReader reader(CurrentDemo.data);
+
+				if (demo_skip_time != 0) {
+					if (reader.GetType() == PacketTypeGrenadePacket) {
+						continue; //after skipping, all nades from during the skip would spawn and explode simultaneously. so ignore nades during skips. 
+					}
+				}
 				//ideally instead of repeating event handler here, maybe break the following part into a third function that would be used by both demo and event handler. 
 				if (status == NetClientStatusConnecting) {
 					if (reader.GetType() != PacketTypeMapStart) {
