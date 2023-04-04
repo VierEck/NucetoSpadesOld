@@ -2001,8 +2001,8 @@ namespace spades {
 			CurrentDemo.start_time = client->GetTimeGlobal();
 			CurrentDemo.delta_time = 0.0f;
 			DemoStarted = !replay;
-			DemoSkippingMap = PauseDemo = false;
-			demo_skip_time = demo_pause_time = demo_count_ups = demo_next_ups = 0;
+			DemoSkippingMap = DemoPaused = PauseDemoAfterSkip = false;
+			demo_skip_time = demo_count_ups = demo_next_ups = 0;
 		}
 
 		void NetClient::DemoStop() {
@@ -2026,25 +2026,28 @@ namespace spades {
 			NetPacketReader read(wri.CreatePacket());
 
 			HandleGamePacket(read);
-			if (client->Replaying && DemoSkippingMap && demo_skip_time == 0) {
+			if (DemoSkippingMap && demo_skip_time == 0) {
 				CurrentDemo.start_time = client->GetTimeGlobal() * client->DemoSpeedMultiplier - CurrentDemo.delta_time;
 				DemoSkippingMap = false;
-			}
-			if (PauseDemo) {
+			} else if (PauseDemoAfterSkip) {
 				DemoCommandPause();
+			}
+			if (GetWorld()->GetPlayer(DemoFollowState.first)) {
+				client->SetFollowedPlayerId(DemoFollowState.first);
+				client->SetFollowMode(DemoFollowState.second);
 			}
 		}
 
 		void NetClient::DemoCommands(std::string command) {
 			if (command == "pause") {
-				if (demo_pause_time == 0) {
+				if (!DemoPaused) {
 					DemoCommandPause();
 				} else {
 					DemoCommandUnpause(true);
 				}
 				return;
 			}
-			if (command == "unpause" && demo_pause_time != 0) {
+			if (command == "unpause" && DemoPaused) {
 				DemoCommandUnpause(true);
 				return;
 			}
@@ -2052,9 +2055,9 @@ namespace spades {
 			if ((int)command.size() <= 3)
 				return;
 
-			if (command.find( "sp ", 0) == 0) {//speed. set speed of demo time (slow down or speed up the demo)
+			if (command.find( "sp ", 0) == 0) {//speed. set replay speed. 
 				command = command.substr(3, (int)command.size());
-				for (int i = 0; i < (int)command.size(); i++) {
+				for (size_t i = 0; i < command.size(); i++) {
 					if (!isdigit(command[i]) && command[i] != '.') {
 						return;
 					}
@@ -2071,11 +2074,11 @@ namespace spades {
 			if (value == -1 || value == 0) 
 				return;
 			
-			if (command.find( "nu ", 0 ) == 0 && demo_pause_time != 0) {//next update. advance to next amount of world updates on pause (ups, update per second)
+			if (command.find( "nu ", 0 ) == 0 && DemoPaused) {//next update. advance to next amount of world updates on pause (ups, update per second)
 				DemoCommandNextUps(value);
 				return;
 			}
-			if (command.find( "pu ", 0 ) == 0 && demo_pause_time != 0) {//prev update. rewind to previous amount of world updates on pause (ups, update per second)
+			if (command.find( "pu ", 0 ) == 0 && DemoPaused) {//prev update. rewind to previous amount of world updates on pause (ups, update per second)
 				DemoCommandPrevUps(value);
 				return;
 			}
@@ -2083,14 +2086,14 @@ namespace spades {
 				DemoCommandFF(value);
 				return;
 			}
-			if (command.find( "bb ", 0 ) == 0) {//rewind. actually starts all over again and fastforwards to time where u want to rewind to lol
+			if (command.find( "bb ", 0 ) == 0) {//rewind. actually starts all over again and fastforwards to time where u want to rewind to. 
 				DemoCommandBB(value);
 				return;
 			}
 		}
 
 		int NetClient::DemoStringToInt(std::string integer) {
-			for (int i = 0; i < (int)integer.size(); i++) {
+			for (size_t i = 0; i < integer.size(); i++) {
 				if (!isdigit(integer[i])) {
 					return -1;
 				}
@@ -2099,15 +2102,15 @@ namespace spades {
 		}
 
 		void NetClient::DemoCommandPause() {
-			demo_pause_time = client->GetTimeGlobal();
-			PauseDemo = true;
+			DemoPaused = true;
+			PauseDemoAfterSkip = true;
 		}
 
-		void NetClient::DemoCommandUnpause(bool commanded) {
+		void NetClient::DemoCommandUnpause(bool skipped) {
 			CurrentDemo.start_time = client->GetTimeGlobal() * client->DemoSpeedMultiplier - CurrentDemo.delta_time;
-			demo_pause_time = 0;
-			if (commanded) { //need to temporarily unpause during fastforward or rewind. only release pause when directly commanded.
-				PauseDemo = false;
+			DemoPaused = false;
+			if (skipped) { //need to temporarily unpause during fastforward or rewind. only release pause when directly commanded.
+				PauseDemoAfterSkip = false;
 			}
 		}
 
@@ -2115,11 +2118,12 @@ namespace spades {
 			if (seconds == 0 || seconds == -1) {
 				return;
 			}
-			if (PauseDemo) {
+			if (PauseDemoAfterSkip) {
 				DemoCommandUnpause(false);
 			}
 			demo_skip_time = seconds;
 			CurrentDemo.start_time -= demo_skip_time;
+			demo_skip_end_time = CurrentDemo.start_time + CurrentDemo.delta_time;
 			DemoFollowState.first = client->GetFollowedPlayerId();
 			DemoFollowState.second = client->GetFollowMode();
 		}
@@ -2129,14 +2133,15 @@ namespace spades {
 				if (seconds == 0 || seconds == -1) {
 					return;
 				}
-				if (PauseDemo) {
+				if (PauseDemoAfterSkip) {
 					DemoCommandUnpause(false);
 				}
 				demo_skip_time = seconds;
 				if (CurrentDemo.delta_time - demo_skip_time < 0) {
 					demo_skip_time = CurrentDemo.delta_time;
 				}
-				CurrentDemo.start_time = client->GetTimeGlobal() * client->DemoSpeedMultiplier - CurrentDemo.delta_time + demo_skip_time;
+				CurrentDemo.start_time += demo_skip_time;
+				demo_skip_end_time = CurrentDemo.start_time + CurrentDemo.delta_time - demo_skip_time;
 				CurrentDemo.delta_time = demo_count_ups = 0;
 				DemoFollowState.first = client->GetFollowedPlayerId();
 				DemoFollowState.second = client->GetFollowMode();
@@ -2147,13 +2152,15 @@ namespace spades {
 			delta = delta.substr(3, (int)delta.size());
 			std::vector<int> timestamp;
 			int previndex = 0;
-			for (int i = 0; i < (int)delta.size(); i++) {
+			for (size_t i = 0; i < delta.size(); i++) {
 				if ((int)timestamp.size() >= 3)
 					break;
-				
+
 				if (delta[i] == ':') {
 					timestamp.push_back(DemoStringToInt(delta.substr(previndex, i - previndex)));
 					previndex = i + 1;
+				} else if (!isdigit(delta[i])) {
+					return;
 				} else if (i == (int)delta.size() - 1) {
 					timestamp.push_back(DemoStringToInt(delta.substr(previndex, i - previndex + 1)));
 				}
@@ -2194,9 +2201,7 @@ namespace spades {
 				return;
 			}
 			client->DemoSpeedMultiplier = speed;
-			if (!PauseDemo) {
-				CurrentDemo.start_time = client->GetTimeGlobal() * speed - CurrentDemo.delta_time;
-			}
+			CurrentDemo.start_time = client->GetTimeGlobal() * speed - CurrentDemo.delta_time;
 		}
 
 		void NetClient::DemoCommandNextUps(int ups) {
@@ -2294,21 +2299,42 @@ namespace spades {
 			if (status == NetClientStatusNotConnected)
 				return;
 
-			if (demo_pause_time != 0 && demo_skip_time == 0)
+			if (DemoPaused && demo_skip_time == 0)
 				return;
 
-			if (demo_skip_time != 0 && CurrentDemo.start_time + CurrentDemo.delta_time >= client->GetTimeGlobal() * client->DemoSpeedMultiplier) {
+			if (demo_skip_time != 0 && CurrentDemo.start_time + CurrentDemo.delta_time >= demo_skip_end_time) {
 				demo_skip_time = 0;
-				client->SetFollowedPlayerId(DemoFollowState.first);
-				client->SetFollowMode(DemoFollowState.second);
 				if (status == NetClientStatusReceivingMap) {
 					DemoSkipMap();
-				} else if (PauseDemo) {
+				} else if (PauseDemoAfterSkip) {
 					DemoCommandPause();
+				}
+				if (GetWorld()) {
+						if (GetWorld()->GetPlayer(DemoFollowState.first)) {
+					client->SetFollowedPlayerId(DemoFollowState.first);
+						client->SetFollowMode(DemoFollowState.second);
+					}
 				}
 			}
 
 			while (CurrentDemo.start_time + CurrentDemo.delta_time < client->GetTimeGlobal() * client->DemoSpeedMultiplier) {
+
+				/*
+				if (demo_skip_time != 0 && CurrentDemo.start_time + CurrentDemo.delta_time >= demo_skip_end_time) {
+					demo_skip_time = 0;
+					if (status == NetClientStatusReceivingMap) {
+						DemoSkipMap();
+					} else if (PauseDemo) {
+						DemoCommandPause();
+					}
+					if (GetWorld()) {
+						if (GetWorld()->GetPlayer(DemoFollowState.first)) {
+							client->SetFollowedPlayerId(DemoFollowState.first);
+							client->SetFollowMode(DemoFollowState.second);
+						}
+					}
+				}*/
+
 				try {
 					ReadNextDemoPacket();
 				} catch (...) {
@@ -2423,37 +2449,23 @@ namespace spades {
 					}
 				}
 			}
-			if (status == NetClientStatusReceivingMap) {
-				if (timeToTryMapLoad > 0) {
-					timeToTryMapLoad--;
-					if (timeToTryMapLoad == 0) {
-						try {
-							MapLoaded();
-						} catch (const std::exception &ex) {
-							if ((strstr(ex.what(), "File truncated") ||
-							     strstr(ex.what(), "EOF reached")) &&
-							    savedPackets.size() < 400) {
-								// hack: more data to load...
-								SPLog(
-								  "Map decoder returned error. Maybe we will get more data...:\n%s",
-								  ex.what());
-								status = NetClientStatusReceivingMap;
-								statusString = _Tr("Demo Replay", "Still loading...");
-								timeToTryMapLoad = 200;
-								DemoSkipMap();
-							} else {
-								DemoStop();
-								statusString = _Tr("Demo Replay", "Error");
-								throw;
-							}
-						} catch (...) {
-							DemoStop();
-							statusString = _Tr("Demo Replay", "Error");
-							throw;
-						}
+
+			/*
+			if (demo_skip_time != 0 && CurrentDemo.start_time + CurrentDemo.delta_time >= demo_saved_time_global) {
+				demo_skip_time = 0;
+				if (status == NetClientStatusReceivingMap) {
+					DemoSkipMap();
+				} else if (PauseDemo) {
+					DemoCommandUnpause(false);
+					DemoCommandPause();
+				}
+				if (GetWorld()) {
+					if (GetWorld()->GetPlayer(DemoFollowState.first)) {
+						client->SetFollowedPlayerId(DemoFollowState.first);
+						client->SetFollowMode(DemoFollowState.second);
 					}
 				}
-			}
+			}*/
 		}
 	}
 }
