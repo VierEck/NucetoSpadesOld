@@ -175,6 +175,7 @@ namespace spades {
 			std::string demo_end_time;
 			int demo_skip_time;
 			void DemoSkipMap();
+			bool DemoFirstJoined;
 
 			void DemoCommands(std::string command);
 			void DemoCommandPause();

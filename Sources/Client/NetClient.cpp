@@ -1293,7 +1293,10 @@ namespace spades {
 								throw;
 							}
 						}
-						client->JoinedGame();
+						if (!client->Replaying || DemoFirstJoined) {
+							client->JoinedGame();
+							DemoFirstJoined = false;
+						}
 
 						if (client->Replaying)
 							joinReplay();
@@ -2003,6 +2006,7 @@ namespace spades {
 			DemoStarted = !replay;
 			DemoSkippingMap = DemoPaused = PauseDemoAfterSkip = false;
 			demo_skip_time = demo_count_ups = demo_next_ups = 0;
+			DemoFirstJoined = true;
 		}
 
 		void NetClient::DemoStop() {
