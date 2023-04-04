@@ -2208,9 +2208,10 @@ namespace spades {
 			if (ups == 0 || ups == -1) {
 				return;
 			}
-			demo_next_ups = ups;
+			demo_skip_time = demo_next_ups = ups;
 			DemoCommandUnpause(false);
 			CurrentDemo.start_time -= demo_next_ups * 10;
+			demo_skip_end_time = CurrentDemo.start_time + CurrentDemo.delta_time;
 			PrevUps = false;
 			DemoFollowState.first = client->GetFollowedPlayerId();
 			DemoFollowState.second = client->GetFollowMode();
@@ -2221,11 +2222,10 @@ namespace spades {
 				if (ups == 0 || ups == -1) {
 					return;
 				}
-				demo_next_ups = demo_count_ups - ups;
+				demo_skip_time = demo_next_ups = demo_count_ups - ups;
 				DemoCommandUnpause(false);
-				CurrentDemo.start_time = client->GetTimeGlobal() * client->DemoSpeedMultiplier - CurrentDemo.delta_time;
+				demo_skip_end_time = CurrentDemo.start_time + CurrentDemo.delta_time;
 				CurrentDemo.delta_time = demo_count_ups = 0;
-				demo_skip_time = 1;
 				PrevUps = true;
 				DemoFollowState.first = client->GetFollowedPlayerId();
 				DemoFollowState.second = client->GetFollowMode();
@@ -2318,23 +2318,6 @@ namespace spades {
 			}
 
 			while (CurrentDemo.start_time + CurrentDemo.delta_time < client->GetTimeGlobal() * client->DemoSpeedMultiplier) {
-
-				/*
-				if (demo_skip_time != 0 && CurrentDemo.start_time + CurrentDemo.delta_time >= demo_skip_end_time) {
-					demo_skip_time = 0;
-					if (status == NetClientStatusReceivingMap) {
-						DemoSkipMap();
-					} else if (PauseDemo) {
-						DemoCommandPause();
-					}
-					if (GetWorld()) {
-						if (GetWorld()->GetPlayer(DemoFollowState.first)) {
-							client->SetFollowedPlayerId(DemoFollowState.first);
-							client->SetFollowMode(DemoFollowState.second);
-						}
-					}
-				}*/
-
 				try {
 					ReadNextDemoPacket();
 				} catch (...) {
@@ -2449,23 +2432,6 @@ namespace spades {
 					}
 				}
 			}
-
-			/*
-			if (demo_skip_time != 0 && CurrentDemo.start_time + CurrentDemo.delta_time >= demo_saved_time_global) {
-				demo_skip_time = 0;
-				if (status == NetClientStatusReceivingMap) {
-					DemoSkipMap();
-				} else if (PauseDemo) {
-					DemoCommandUnpause(false);
-					DemoCommandPause();
-				}
-				if (GetWorld()) {
-					if (GetWorld()->GetPlayer(DemoFollowState.first)) {
-						client->SetFollowedPlayerId(DemoFollowState.first);
-						client->SetFollowMode(DemoFollowState.second);
-					}
-				}
-			}*/
 		}
 	}
 }
