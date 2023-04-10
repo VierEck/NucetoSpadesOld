@@ -42,6 +42,8 @@
 SPADES_SETTING(cg_minimapPlayerColor);
 DEFINE_SPADES_SETTING(cg_scoreboardGuns, "1");
 
+SPADES_SETTING(cg_specHealth, "1");
+
 namespace spades {
 	namespace client {
 
@@ -317,8 +319,9 @@ namespace spades {
 				font->Draw(ent.name, MakeVector2(colX + 45.f, rowY), 1.f, color);
 
 				color = white;
-				if (cg_scoreboardGuns) {
+
 				Player& p = *world->GetPlayer(ent.id);
+				if (cg_scoreboardGuns) {
                     IImage* weapon;
                     switch (p.GetWeaponType()) {
                         case RIFLE_WEAPON: weapon = rifle; break;
@@ -330,6 +333,16 @@ namespace spades {
 					renderer->DrawImage(weapon, AABB2(colX + colWidth - 88.f, rowY, 50, 20));
 				}
 				
+				if (cg_specHealth && world->GetLocalPlayer()) {
+					if (world->GetLocalPlayer()->IsSpectator()) {
+						int hp = p.GetHealth();
+						sprintf(buf, "%d", hp);
+						size = font->Measure(buf);
+						float green = 1.f * (hp > 50) + (hp/100.f) * (hp <= 50);
+						float red = 1.f * (hp <= 50) + (1.f - hp/100.f) * (hp > 50);
+						font->Draw(buf, MakeVector2(colX + colWidth - 98.f - size.x, rowY), 1.f, MakeVector4(red, green, 0, 1));
+					}
+				}
 
 				sprintf(buf, "%d", ent.score);
 				size = font->Measure(buf);

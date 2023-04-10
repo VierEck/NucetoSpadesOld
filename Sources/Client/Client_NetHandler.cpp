@@ -351,5 +351,43 @@ namespace spades {
 		void Client::MarkWorldUpdate() {
 			upsCounter.MarkFrame();
 		}
+
+		std::string Client::WriteHitAccuaracy(spades::client::Player *killer, int type) {
+			HitTrack clicks = killer->GetHitTrack();
+			std::string AccMessage = "";
+			char buf[255];
+
+			if (type != HitTypeMelee) {
+				WeaponType weapon = killer->GetWeaponType();
+				switch (weapon) {
+					case RIFLE_WEAPON: sprintf(buf, "Rifle"); break;
+					case SMG_WEAPON: sprintf(buf, "Smg"); break;
+					case SHOTGUN_WEAPON: sprintf(buf, "Shotgun"); break;
+					default: break; 
+				}
+				AccMessage += buf;
+
+				float allHits = clicks.amountHead + clicks.amountTorso + clicks.amountArms + clicks.amountLegs;
+				float overallAcc = (allHits / (float)clicks.amountClicks) * 100.f;
+				sprintf(buf, "(%.0f, %.2f%%)", allHits, overallAcc);
+				AccMessage += buf;
+
+				switch (type) {
+					case HitTypeTorso:
+						sprintf(buf, " Torso(%d, %.2f%%)", clicks.amountTorso, ((float)clicks.amountTorso / allHits) * 100.f); break;
+					case HitTypeHead:
+						sprintf(buf, " Head(%d, %.2f%%)", clicks.amountHead, ((float)clicks.amountHead / allHits) * 100.f); break;
+					case HitTypeArms:
+						sprintf(buf, " Arms(%d, %.2f%%)", clicks.amountArms, ((float)clicks.amountArms / allHits) * 100.f); break;
+					case HitTypeLegs:
+						sprintf(buf, " Legs(%d, %.2f%%)", clicks.amountLegs, ((float)clicks.amountLegs / allHits) * 100.f); break;
+					default: break;
+				}
+				AccMessage += buf;
+			} else {
+				AccMessage += "Melee"; 
+			}
+			return AccMessage;
+		}
 	}
 }

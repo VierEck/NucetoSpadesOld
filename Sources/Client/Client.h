@@ -500,6 +500,8 @@ namespace spades {
 			bool GetFollowMode() { return followCameraState.enabled; }
 			void SetFollowMode(bool enable) { followCameraState.enabled = enable; }
 			float DemoSpeedMultiplier;
+
+			std::string WriteHitAccuaracy(Player *, int hittype);
 		};
 	}
 }

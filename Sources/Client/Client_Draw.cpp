@@ -102,6 +102,8 @@ DEFINE_SPADES_SETTING(n_TargetLinesDynamicMultiplier, "10");
 DEFINE_SPADES_SETTING(n_hitTestSize, "210");
 DEFINE_SPADES_SETTING(n_hitTestTransparency, "1");
 
+DEFINE_SPADES_SETTING(cg_specHealth, "1");
+
 namespace spades {
 	namespace client {
 
@@ -875,11 +877,11 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			// ADDED: Draw player names
-			if (dd_specNames && AreCheatsEnabled()) {
+			if (AreCheatsEnabled() && (dd_specNames || cg_specHealth)) {
 				for (int i = 0; i < world->GetNumPlayerSlots(); ++i) {
 					Player *pIter = world->GetPlayer(i);
 
-					if (!pIter || !pIter->IsAlive() || pIter->GetTeamId() >= 2) {
+					if (!pIter || pIter->GetTeamId() >= 2) {
 						continue;
 					}
 
@@ -890,11 +892,36 @@ namespace spades {
 					Vector2 pos = {posxyz.x, posxyz.y};
 
 					IFont *font = fontManager->GetGuiFont();
-					Vector2 size = font->Measure(pIter->GetName());
-					pos.x -= size.x * .5f;
-					pos.y -= size.y;
-					font->DrawShadow(pIter->GetName(), pos, 0.85, MakeVector4(1, 1, 1, 1),
-					                 MakeVector4(0, 0, 0, 0.5));
+
+					if (dd_specNames) {
+						Vector2 size = font->Measure(pIter->GetName());
+						float x = pos.x - size.x * .5f;
+						pos.y -= size.y;
+						font->DrawShadow(pIter->GetName(), {x, pos.y}, 0.85, MakeVector4(1, 1, 1, 1),
+						                 MakeVector4(0, 0, 0, 0.5));
+					}
+
+					if (cg_specHealth) {
+						pos.x -= 18;
+						pos.y -= 2;
+
+						Handle<IImage> img = renderer->RegisterImage("Gfx/White.tga");
+						renderer->SetColorAlphaPremultiplied(MakeVector4(255, 0, 0, 1));
+						renderer->DrawImage(img, MakeVector2(pos.x - 1, pos.y - 1), AABB2(0, 0, 34, 6));
+
+						int hp = pIter->GetHealth();
+						float green = 1.f * (hp > 50) + (hp/100.f) * (hp <= 50);
+						float red = 1.f * (hp <= 50) + (1.f - hp/100.f) * (hp > 50);
+
+						renderer->SetColorAlphaPremultiplied(MakeVector4(red, green, 0, 1));
+						renderer->DrawImage(img, MakeVector2(pos.x, pos.y), AABB2(0, 0, (float)hp * 32.f / 100.f, 4));
+
+						std::string hpString = std::to_string(hp);
+						pos.x += 35;
+						pos.y -= 5;
+
+						font->DrawShadow(hpString, {pos.x, pos.y}, 0.71f, MakeVector4(red, green, 0, 1), MakeVector4(0, 0, 0, 1));
+					}
 				}
 			}
 			// END OF ADDED
@@ -940,6 +967,8 @@ namespace spades {
 				if (GetWorld()->GetLocalPlayer()->IsSpectator()) {
 					addLine(_Tr("Client", "[{0}] Unfollow", TranslateKeyName(cg_keyReloadWeapon)));
 				}
+
+				DrawHealth();
 			} else {
 				addLine(_Tr("Client", "[{0}/{1}] Follow a player", TranslateKeyName(cg_keyAttack),
 				            TranslateKeyName(cg_keyAltAttack)));
@@ -1045,7 +1074,13 @@ namespace spades {
 		void Client::DrawHealth() {
 			SPADES_MARK_FUNCTION();
 
-			Player *p = GetWorld()->GetLocalPlayer();
+			Player *p;
+			if (GetWorld()->GetLocalPlayer()->IsSpectator()) {
+				//Player &p = GetCameraTargetPlayer();
+				p = GetWorld()->GetPlayer(followedPlayerId);
+			} else {
+				p = GetWorld()->GetLocalPlayer();
+			}
 			IFont *font;
 			// float scrWidth = renderer->ScreenWidth();
 			float scrHeight = renderer->ScreenHeight();

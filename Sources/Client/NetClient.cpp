@@ -93,6 +93,8 @@ namespace spades {
 				PacketTypeVersionGet = 33,      // S2C
 				PacketTypeVersionSend = 34,     // C2S
 
+				PacketTypeGlobalHit = 40,
+
 			};
 
 			enum class VersionInfoPropertyId : std::uint8_t {
@@ -921,6 +923,14 @@ namespace spades {
 
 						WeaponInput inp = ParseWeaponInput(reader.ReadByte());
 
+						if (inp.primary) {
+							if (p->GetTool() == Player::ToolWeapon) {
+								HitTrack clicks = p->GetHitTrack();
+								clicks.amountClicks++;
+								p->SetHitTrack(clicks);
+							}
+						}
+
 						if (GetWorld()->GetLocalPlayer() == p)
 							break;
 
@@ -1326,6 +1336,7 @@ namespace spades {
 					if (p != killer) {
 						GetWorld()->GetPlayerPersistent(killer->GetId()).kills += 1;
 					}
+					p->SetHP(0, HurtTypeWeapon, killer->GetPosition());
 				} break;
 				case PacketTypeChatMessage: {
 					// might be wrong player id for server message
@@ -1527,6 +1538,51 @@ namespace spades {
 					// maybe this command is intended to change local player's
 					// weapon...
 					// p->SetWeaponType(wType);
+				} break;
+				//unofficial protocol extensions ahead. new packets from here on 
+				case PacketTypeGlobalHit: {
+					if (!GetWorld())
+						break;
+					if (!GetWorld()->GetLocalPlayer()->IsSpectator())
+						break;
+
+					Player *killer = GetPlayer(reader.ReadByte());
+					Player *victim = GetPlayer(reader.ReadByte());
+					if (!victim)
+						break;
+
+					int hp = reader.ReadByte();
+					int type = reader.ReadByte();
+
+					unsigned char distance2d = reader.ReadByte();
+					float timeSincePrevShot = reader.ReadFloat();
+
+					victim->SetHP(hp, killer ? HurtTypeWeapon : HurtTypeFall, killer->GetPosition());
+
+					if (killer) {
+						HitTrack clicks = killer->GetHitTrack();
+						switch (type) {
+							case HitTypeTorso: 
+								clicks.amountTorso++; break;
+							case HitTypeHead: 
+								clicks.amountHead++; break;
+							case HitTypeArms: 
+								clicks.amountArms++; break;
+							case HitTypeLegs: 
+								clicks.amountLegs++; break;
+							default: SPRaise("Received invalid hittype: %d", type);
+						}
+						killer->SetHitTrack(clicks);
+
+						if (killer != GetPlayer(client->GetFollowedPlayerId()))
+							break;
+						std::string hitMessage = killer->GetName() + " shot " + victim->GetName();
+						char buf[100];
+						sprintf(buf, " dist: %i blocks dT: %.2f ms ", distance2d, timeSincePrevShot);
+						hitMessage += buf;
+						hitMessage += client->WriteHitAccuaracy(killer, type);
+						client->ServerSentMessage(hitMessage);
+					}
 				} break;
 				default:
 					printf("WARNING: dropped packet %d\n", (int)reader.GetType());

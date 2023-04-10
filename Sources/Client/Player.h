@@ -56,6 +56,14 @@ namespace spades {
 			WeaponInput() : primary(false), secondary(false) {}
 		};
 
+		struct HitTrack {
+			int amountClicks = 0; 
+			int amountHead = 0;
+			int amountTorso = 0;
+			int amountArms = 0;
+			int amountLegs = 0;
+		};
+
 		class Player {
 		public:
 			enum ToolType { ToolSpade = 0, ToolBlock, ToolWeapon, ToolGrenade };
@@ -123,6 +131,10 @@ namespace spades {
 			bool reloadingServerSide;
 
 			float respawnTime;
+
+			HitTrack rifleClicks;
+			HitTrack smgClicks;
+			HitTrack shotgunClicks;
 
 			void RepositionPlayer(const Vector3 &);
 			void MovePlayer(float fsynctics);
@@ -194,8 +206,8 @@ namespace spades {
 			bool IsAlive();
 			/** @return world time to respawn */
 			float GetRespawnTime() { return respawnTime; }
-			/** Returns player's health (local player only) */
-			int GetHealth() { return health; }
+			
+			int GetHealth() { return this->health; }
 
 			Vector3 GetPosition() { return position; }
 			Vector3 GetFront();
@@ -240,6 +252,9 @@ namespace spades {
 			bool OverlapsWithOneBlock(IntVector3);
 
 			float BoxDistanceToBlock(IntVector3);
+
+			HitTrack GetHitTrack();
+			void SetHitTrack(HitTrack);
 		};
 	}
 }

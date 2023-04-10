@@ -64,7 +64,7 @@ namespace spades {
 			this->weapon->Reset();
 			this->color = color;
 
-			health = 100;
+			this->health = 100;
 			grenades = 3;
 			blockStocks = 50;
 			blockColor = IntVector3::Make(111, 111, 111);
@@ -1565,6 +1565,28 @@ namespace spades {
 		bool Player::OverlapsWithOneBlock(spades::IntVector3 vec) {
 			SPADES_MARK_FUNCTION_DEBUG();
 			return OverlapsWith(AABB3(vec.x, vec.y, vec.z, 1, 1, 1));
+		}
+
+		void Player::SetHitTrack(HitTrack clicks) {
+			switch (this->weapon->GetWeaponType()) {
+				case RIFLE_WEAPON:
+					rifleClicks = clicks; break;
+				case SMG_WEAPON:
+					smgClicks = clicks; break;
+				case SHOTGUN_WEAPON:
+					shotgunClicks = clicks; break;
+			}
+		}
+
+		HitTrack Player::GetHitTrack() {
+			switch (this->weapon->GetWeaponType()) {
+				case RIFLE_WEAPON:
+					return rifleClicks;
+				case SMG_WEAPON:
+					return smgClicks;
+				case SHOTGUN_WEAPON:
+					return shotgunClicks;
+			}
 		}
 
 #pragma mark - Block Construction
