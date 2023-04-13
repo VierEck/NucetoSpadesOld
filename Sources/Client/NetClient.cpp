@@ -536,149 +536,15 @@ namespace spades {
 						SPRaise("Exception while handling packet type 0x%08x:\n%s", type,
 						        ex.what());
 					}
-				}
 
-				if (status == NetClientStatusConnecting) {
+					try {
+						DoPackets(reader);
+					} catch (...) {
+						throw; //idk
+					}
+				} else if (status == NetClientStatusConnecting) {
 					if (event.type == ENET_EVENT_TYPE_CONNECT) {
 						statusString = _Tr("NetClient", "Awaiting for state");
-					} else if (event.type == ENET_EVENT_TYPE_RECEIVE) {
-						auto &reader = readerOrNone.value();
-						reader.DumpDebug();
-						if (reader.GetType() != PacketTypeMapStart) {
-							SPRaise("Unexpected packet: %d", (int)reader.GetType());
-						}
-
-						mapSize = reader.ReadInt();
-						status = NetClientStatusReceivingMap;
-						statusString = _Tr("NetClient", "Loading snapshot");
-						timeToTryMapLoad = 30;
-						tryMapLoadOnPacketType = true;
-					}
-				} else if (status == NetClientStatusReceivingMap) {
-					if (event.type == ENET_EVENT_TYPE_RECEIVE) {
-						auto &reader = readerOrNone.value();
-
-						if (reader.GetType() == PacketTypeMapChunk) {
-							std::vector<char> dt = reader.GetData();
-							dt.erase(dt.begin());
-							mapData.insert(mapData.end(), dt.begin(), dt.end());
-
-							timeToTryMapLoad = 200;
-
-							statusString = _Tr("NetClient", "Loading snapshot ({0}/{1})",
-							                   mapData.size(), mapSize);
-
-							if (mapSize == mapData.size()) {
-								status = NetClientStatusConnected;
-								statusString = _Tr("NetClient", "Connected");
-
-								try {
-									MapLoaded();
-								} catch (const std::exception &ex) {
-									if (strstr(ex.what(), "File truncated") ||
-									    strstr(ex.what(), "EOF reached")) {
-										SPLog("Map decoder returned error. Maybe we will get more "
-										      "data...:\n%s",
-										      ex.what());
-										// hack: more data to load...
-										status = NetClientStatusReceivingMap;
-										statusString = _Tr("NetClient", "Still loading...");
-									} else {
-										Disconnect();
-										statusString = _Tr("NetClient", "Error");
-										throw;
-									}
-
-								} catch (...) {
-									Disconnect();
-									statusString = _Tr("NetClient", "Error");
-									throw;
-								}
-							}
-
-						} else {
-							reader.DumpDebug();
-
-							// On pyspades and derivative servers the actual size of the map data
-							// cannot be known in beforehand, so we have to find the end of the data
-							// by one of other means. One indicator for this would be a packet of a
-							// type other than MapChunk, which usually marks the end of map data
-							// transfer.
-							//
-							// However, we can't rely on this heuristics entirely because there are
-							// several occasions where the server would send non-MapChunk packets
-							// during map loading sequence, for example:
-							//
-							//  - World update packets (WorldUpdate, ExistingPlayer, and
-							//    CreatePlayer) for the current round. We must store such packets
-							//	  temporarily and process them later when a `World` is created.
-							//
-							//  - Leftover reload packet from the previous round. This happens when
-							//    you initiate the reload action and a map change occurs before it
-							// 	  is completed. In pyspades, sending a reload packet is implemented
-							// 	  by registering a callback function to the Twisted reactor. This
-							//    callback function sends a reload packet, but it does not check if
-							//    the current game round is finished, nor is it unregistered on a
-							//    map change.
-							//
-							//    Such a reload packet would not (and should not) have any effect on
-							//    the current round. Also, an attempt to process it would result in
-							//    an "invalid player ID" exception, so we simply drop it during
-							//    map load sequence.
-							//
-							if (reader.GetType() == PacketTypeWeaponReload) {
-								// Drop reload packets
-							} else if (reader.GetType() != PacketTypeWorldUpdate &&
-							           reader.GetType() != PacketTypeExistingPlayer &&
-							           reader.GetType() != PacketTypeCreatePlayer &&
-							           tryMapLoadOnPacketType) {
-								status = NetClientStatusConnected;
-								statusString = _Tr("NetClient", "Connected");
-
-								try {
-									MapLoaded();
-								} catch (const std::exception &ex) {
-									tryMapLoadOnPacketType = false;
-									if (strstr(ex.what(), "File truncated") ||
-									    strstr(ex.what(), "EOF reached")) {
-										SPLog("Map decoder returned error. Maybe we will get more "
-										      "data...:\n%s",
-										      ex.what());
-										// hack: more data to load...
-										status = NetClientStatusReceivingMap;
-										statusString = _Tr("NetClient", "Still loading...");
-										goto stillLoading;
-									} else {
-										Disconnect();
-										statusString = _Tr("NetClient", "Error");
-										throw;
-									}
-								} catch (...) {
-									Disconnect();
-									statusString = _Tr("NetClient", "Error");
-									throw;
-								}
-								HandleGamePacket(reader);
-							} else {
-							stillLoading:
-								savedPackets.push_back(reader.GetData());
-							}
-
-							// HandleGamePacket(reader);
-						}
-					}
-				} else if (status == NetClientStatusConnected) {
-					if (event.type == ENET_EVENT_TYPE_RECEIVE) {
-						auto &reader = readerOrNone.value();
-						// reader.DumpDebug();
-						try {
-							HandleGamePacket(reader);
-						} catch (const std::exception &ex) {
-							int type = reader.GetType();
-							reader.DumpDebug();
-							SPRaise("Exception while handling packet type 0x%08x:\n%s", type,
-							        ex.what());
-						}
 					}
 				}
 			}
@@ -712,6 +578,165 @@ namespace spades {
 						}
 					}
 				}
+			}
+		}
+
+		void NetClient::DoPackets(NetPacketReader &reader) {
+			if (status == NetClientStatusConnecting) {
+				reader.DumpDebug();
+				if (reader.GetType() != PacketTypeMapStart) {
+					SPRaise("Unexpected packet: %d", (int)reader.GetType());
+				}
+
+				mapSize = reader.ReadInt();
+				status = NetClientStatusReceivingMap;
+				statusString = _Tr("NetClient", "Loading snapshot");
+				timeToTryMapLoad = 30;
+				tryMapLoadOnPacketType = true;
+				if (client->Replaying) {
+					DemoSkipMap();
+				}
+			} else if (status == NetClientStatusReceivingMap) {
+				if (reader.GetType() == PacketTypeMapChunk) {
+					std::vector<char> dt = reader.GetData();
+					dt.erase(dt.begin());
+					mapData.insert(mapData.end(), dt.begin(), dt.end());
+
+					timeToTryMapLoad = 200;
+
+					statusString = _Tr("NetClient", "Loading snapshot ({0}/{1})",
+					                   mapData.size(), mapSize);
+
+					if (mapSize == mapData.size()) {
+						status = NetClientStatusConnected;
+						statusString = _Tr("NetClient", "Connected");
+
+						try {
+							MapLoaded();
+						} catch (const std::exception &ex) {
+							if (strstr(ex.what(), "File truncated") ||
+							    strstr(ex.what(), "EOF reached")) {
+								SPLog("Map decoder returned error. Maybe we will get more "
+								      "data...:\n%s",
+								      ex.what());
+								// hack: more data to load...
+								status = NetClientStatusReceivingMap;
+								statusString = _Tr("NetClient", "Still loading...");
+								if (client->Replaying) {
+									DemoSkipMap();
+								}
+							} else {
+								if (!client->Replaying) {
+									Disconnect();
+								} else {
+									DemoStop();
+								}
+								statusString = _Tr("NetClient", "Error");
+								throw;
+							}
+
+						} catch (...) {
+							if (!client->Replaying) {
+								Disconnect();
+							} else {
+								DemoStop();
+							}
+							statusString = _Tr("NetClient", "Error");
+							throw;
+						}
+					}
+				} else {
+					reader.DumpDebug();
+
+					// On pyspades and derivative servers the actual size of the map data
+					// cannot be known in beforehand, so we have to find the end of the data
+					// by one of other means. One indicator for this would be a packet of a
+					// type other than MapChunk, which usually marks the end of map data
+					// transfer.
+					//
+					// However, we can't rely on this heuristics entirely because there are
+					// several occasions where the server would send non-MapChunk packets
+					// during map loading sequence, for example:
+					//
+					//  - World update packets (WorldUpdate, ExistingPlayer, and
+					//    CreatePlayer) for the current round. We must store such packets
+					//	  temporarily and process them later when a `World` is created.
+					//
+					//  - Leftover reload packet from the previous round. This happens when
+					//    you initiate the reload action and a map change occurs before it
+					// 	  is completed. In pyspades, sending a reload packet is implemented
+					// 	  by registering a callback function to the Twisted reactor. This
+					//    callback function sends a reload packet, but it does not check if
+					//    the current game round is finished, nor is it unregistered on a
+					//    map change.
+					//
+					//    Such a reload packet would not (and should not) have any effect on
+					//    the current round. Also, an attempt to process it would result in
+					//    an "invalid player ID" exception, so we simply drop it during
+					//    map load sequence.
+					//
+					if (reader.GetType() == PacketTypeWeaponReload) {
+						// Drop reload packets
+					} else if (reader.GetType() != PacketTypeWorldUpdate &&
+					           reader.GetType() != PacketTypeExistingPlayer &&
+					           reader.GetType() != PacketTypeCreatePlayer &&
+					           tryMapLoadOnPacketType) {
+						status = NetClientStatusConnected;
+						statusString = _Tr("NetClient", "Connected");
+
+						try {
+							MapLoaded();
+						} catch (const std::exception &ex) {
+							tryMapLoadOnPacketType = false;
+							if (strstr(ex.what(), "File truncated") ||
+							    strstr(ex.what(), "EOF reached")) {
+								SPLog("Map decoder returned error. Maybe we will get more "
+								      "data...:\n%s",
+								      ex.what());
+								// hack: more data to load...
+								status = NetClientStatusReceivingMap;
+								statusString = _Tr("NetClient", "Still loading...");
+								if (client->Replaying) {
+									DemoSkipMap();
+								}
+								goto stillLoading;
+							} else {
+								if (!client->Replaying) {
+									Disconnect();
+								} else {
+									DemoStop();
+								}
+								statusString = _Tr("NetClient", "Error");
+								throw;
+							}
+						} catch (...) {
+							if (!client->Replaying) {
+								Disconnect();
+							} else {
+								DemoStop();
+							}
+							statusString = _Tr("NetClient", "Error");
+							throw;
+						}
+						HandleGamePacket(reader);
+					} else {
+					stillLoading:
+						savedPackets.push_back(reader.GetData());
+					}
+
+					// HandleGamePacket(reader);
+				}
+					
+			} else if (status == NetClientStatusConnected) {
+				// reader.DumpDebug();
+				try {
+					HandleGamePacket(reader);
+				} catch (const std::exception &ex) {
+					int type = reader.GetType();
+					reader.DumpDebug();
+					SPRaise("Exception while handling packet type 0x%08x:\n%s", type,
+					        ex.what());
+				}		
 			}
 		}
 
@@ -1357,6 +1382,9 @@ namespace spades {
 					mapSize = reader.ReadInt();
 					status = NetClientStatusReceivingMap;
 					statusString = _Tr("NetClient", "Loading snapshot");
+					if (client->Replaying) {
+						DemoSkipMap();
+					}
 				} break;
 				case PacketTypeMapChunk: SPRaise("Unexpected: received Map Chunk while game");
 				case PacketTypePlayerLeft: {
@@ -2014,6 +2042,76 @@ namespace spades {
 			CurrentDemo = ResetStruct;
 		}
 
+		void NetClient::ReadNextDemoPacket() {
+			if (!CurrentDemo.fp)
+				return;
+
+			float c_time;
+			unsigned short len;
+
+			if (fread(&c_time, sizeof(c_time), 1, CurrentDemo.fp) != 1) {
+				if (GetWorld()) {
+					client->SetWorld(NULL);
+				}
+				status = NetClientStatusNotConnected;
+				if (feof(CurrentDemo.fp)) {
+					statusString = "Demo Ended: End of Recording reached";
+					SPRaise("Demo Ended: End of Recording reached");
+				} else {
+					statusString = "Demo Ended: Error";
+					SPRaise("Demo Ended: Error");
+				}
+				throw;
+			}
+			CurrentDemo.delta_time = c_time;
+
+			fread(&len, sizeof(len), 1, CurrentDemo.fp);
+			CurrentDemo.data.resize(len);
+
+			fread(CurrentDemo.data.data(), len, 1, CurrentDemo.fp);
+		}
+
+		void NetClient::DoDemo() {
+			if (status == NetClientStatusNotConnected)
+				return;
+
+			if (DemoPaused && demo_skip_time == 0)
+				return;
+
+			if (demo_skip_time != 0 && CurrentDemo.start_time + CurrentDemo.delta_time >= demo_skip_end_time) {
+				demo_skip_time = 0;
+				if (status == NetClientStatusReceivingMap) {
+					DemoSkipMap();
+				} else if (PauseDemoAfterSkip) {
+					DemoCommandPause();
+				}
+				DemoSetFollow();
+			}
+
+			while (CurrentDemo.start_time + CurrentDemo.delta_time < client->GetTimeGlobal() * client->DemoSpeedMultiplier) {
+				try {
+					ReadNextDemoPacket();
+				} catch (...) {
+					throw;
+				}
+				stmp::optional<NetPacketReader> readerOrNone;
+				readerOrNone.reset(CurrentDemo.data);
+				NetPacketReader &reader = readerOrNone.value();
+
+				if (demo_skip_time != 0) {
+					if (reader.GetType() == PacketTypeGrenadePacket) {
+						continue; //after skipping, all nades from during the skip would spawn and explode simultaneously. so ignore nades during skips. 
+					}
+				}
+
+				try {
+					DoPackets(reader);
+				} catch (...) {
+					throw; //idk
+				}
+			}
+		}
+
 		void NetClient::joinReplay() {
 			SPADES_SETTING(cg_playerName);
 			NetPacketWriter wri(PacketTypeExistingPlayer);
@@ -2034,6 +2132,33 @@ namespace spades {
 				DemoCommandPause();
 			}
 			DemoSetFollow();
+		}
+
+		int NetClient::GetDemoTimer() {
+			return CurrentDemo.delta_time;
+		}
+
+		void NetClient::DemoSkipMap() {
+			if (!DemoSkippingMap && demo_skip_time == 0) {
+				CurrentDemo.start_time -= 300; //maptransfer cant be longer than 5 minutes. this is more than generous.
+				DemoSkippingMap = true;
+			}
+		}
+
+		void NetClient::DemoSetFollow() {
+			if (!GetWorld())
+				return;
+			if (!GetWorld()->GetPlayer(DemoFollowState.first))
+				return;
+
+			Player *p = GetWorld()->GetPlayer(DemoFollowState.first);
+			if (p->IsSpectator())
+				return;
+			if (p->GetFront().GetPoweredLength() < .01f)
+				return;
+
+			client->SetFollowedPlayerId(DemoFollowState.first);
+			client->SetFollowMode(DemoFollowState.second);
 		}
 
 		void NetClient::DemoCommands(std::string command) {
@@ -2246,202 +2371,6 @@ namespace spades {
 						DemoSetFollow();
 						CurrentDemo.start_time = client->GetTimeGlobal() * client->DemoSpeedMultiplier - CurrentDemo.delta_time;
 						DemoCommandPause();
-					}
-				}
-			}
-		}
-
-		int NetClient::GetDemoTimer() {
-			return CurrentDemo.delta_time;
-		}
-
-		void NetClient::DemoSkipMap() {
-			if (!DemoSkippingMap && demo_skip_time == 0) {
-				CurrentDemo.start_time -= 300; //maptransfer cant be longer than 5 minutes. this is more than generous.
-				DemoSkippingMap = true;
-			}
-		}
-
-		void NetClient::DemoSetFollow() {
-			if (!GetWorld())
-				return;
-			if (!GetWorld()->GetPlayer(DemoFollowState.first))
-				return;
-
-			Player *p = GetWorld()->GetPlayer(DemoFollowState.first);
-			if (p->IsSpectator())
-				return;
-			if (p->GetFront().GetPoweredLength() < .01f)
-				return;
-
-			client->SetFollowedPlayerId(DemoFollowState.first);
-			client->SetFollowMode(DemoFollowState.second);
-		}
-
-		void NetClient::ReadNextDemoPacket() {
-			if (!CurrentDemo.fp)
-				return;
-
-			float c_time;
-			unsigned short len;
-
-			if (fread(&c_time, sizeof(c_time), 1, CurrentDemo.fp) != 1) {
-				if (GetWorld()) {
-					client->SetWorld(NULL);
-				}
-				status = NetClientStatusNotConnected;
-				if (feof(CurrentDemo.fp)) {
-					statusString = "Demo Ended: End of Recording reached";
-					SPRaise("Demo Ended: End of Recording reached");
-				} else {
-					statusString = "Demo Ended: Error";
-					SPRaise("Demo Ended: Error");
-				}
-				throw;
-			}
-			CurrentDemo.delta_time = c_time;
-
-			fread(&len, sizeof(len), 1, CurrentDemo.fp);
-			CurrentDemo.data.resize(len);
-
-			fread(CurrentDemo.data.data(), len, 1, CurrentDemo.fp);
-		}
-
-		void NetClient::DoDemo() {
-			if (status == NetClientStatusNotConnected)
-				return;
-
-			if (DemoPaused && demo_skip_time == 0)
-				return;
-
-			if (demo_skip_time != 0 && CurrentDemo.start_time + CurrentDemo.delta_time >= demo_skip_end_time) {
-				demo_skip_time = 0;
-				if (status == NetClientStatusReceivingMap) {
-					DemoSkipMap();
-				} else if (PauseDemoAfterSkip) {
-					DemoCommandPause();
-				}
-				DemoSetFollow();
-			}
-
-			while (CurrentDemo.start_time + CurrentDemo.delta_time < client->GetTimeGlobal() * client->DemoSpeedMultiplier) {
-				try {
-					ReadNextDemoPacket();
-				} catch (...) {
-					throw;
-				}
-				NetPacketReader reader(CurrentDemo.data);
-
-				if (demo_skip_time != 0) {
-					if (reader.GetType() == PacketTypeGrenadePacket) {
-						continue; //after skipping, all nades from during the skip would spawn and explode simultaneously. so ignore nades during skips. 
-					}
-				}
-				//ideally instead of repeating event handler here, maybe break the following part into a third function that would be used by both demo and event handler. 
-				if (status == NetClientStatusConnecting) {
-					if (reader.GetType() != PacketTypeMapStart) {
-						SPRaise("Unexpected packet: %d", (int)reader.GetType());
-					}
-					reader.DumpDebug();
-					mapSize = reader.ReadInt();
-					status = NetClientStatusReceivingMap;
-					statusString = _Tr("Demo Replay", "Loading snapshot");
-					timeToTryMapLoad = 30;
-					tryMapLoadOnPacketType = true;
-					DemoSkipMap();
-				} else if (status == NetClientStatusReceivingMap) {
-					if (reader.GetType() == PacketTypeMapChunk) {
-						std::vector<char> dt = reader.GetData();
-						dt.erase(dt.begin());
-						mapData.insert(mapData.end(), dt.begin(), dt.end());
-
-						timeToTryMapLoad = 200;
-
-						statusString = _Tr("Demo Replay", "Loading snapshot ({0}/{1})",
-						                   mapData.size(), mapSize);
-
-						if (mapSize == mapData.size()) {
-							status = NetClientStatusConnected;
-							statusString = _Tr("Demo Replay", "Connected");
-
-							try {
-								MapLoaded();
-							} catch (const std::exception &ex) {
-								if (strstr(ex.what(), "File truncated") ||
-								    strstr(ex.what(), "EOF reached")) {
-									SPLog("Map decoder returned error. Maybe we will get more "
-									      "data...:\n%s",
-									      ex.what());
-									// hack: more data to load...
-									status = NetClientStatusReceivingMap;
-									statusString = _Tr("Demo Replay", "Still loading...");
-									DemoSkipMap();
-								} else {
-									DemoStop();
-									statusString = _Tr("Demo Replay", "Error");
-									throw;
-								}
-
-							} catch (...) {
-								DemoStop();
-								statusString = _Tr("Demo Replay", "Error");
-								throw;
-							}
-						}
-
-					} else {
-						reader.DumpDebug();
-						if (reader.GetType() == PacketTypeWeaponReload) {
-							// Drop reload packets
-						} else if (reader.GetType() != PacketTypeWorldUpdate &&
-						           reader.GetType() != PacketTypeExistingPlayer &&
-						           reader.GetType() != PacketTypeCreatePlayer &&
-						           tryMapLoadOnPacketType) {
-							status = NetClientStatusConnected;
-							statusString = _Tr("Demo Replay", "Connected");
-
-							try {
-								MapLoaded();
-							} catch (const std::exception &ex) {
-								tryMapLoadOnPacketType = false;
-								if (strstr(ex.what(), "File truncated") ||
-								    strstr(ex.what(), "EOF reached")) {
-									reader.DumpDebug();
-									SPLog("Map decoder returned error. Maybe we will get more "
-									      "data...:\n%s",
-									      ex.what());
-									// hack: more data to load...
-									status = NetClientStatusReceivingMap;
-									statusString = _Tr("Demo Replay", "Still loading...");
-									DemoSkipMap();
-									goto stillLoading;
-								} else {
-									DemoStop();
-									statusString = _Tr("Demo Replay", "Error");
-									throw;
-								}
-							} catch (...) {
-								DemoStop();
-								statusString = _Tr("Demo Replay", "Error");
-								throw;
-							}
-							HandleGamePacket(reader);
-						} else {
-						stillLoading:
-							savedPackets.push_back(reader.GetData());
-						}
-					}
-				}  else if (status == NetClientStatusConnected) {
-			 		try {
-						HandleGamePacket(reader);
-						if (reader.GetType() == PacketTypeMapStart) {
-							DemoSkipMap();
-						}
-					} catch (const std::exception &ex) {
-						int type = reader.GetType();
-						reader.DumpDebug();
-						SPRaise("Exception while handling packet type 0x%08x:\n%s", type,
-						        ex.what());
 					}
 				}
 			}

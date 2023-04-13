@@ -140,6 +140,7 @@ namespace spades {
 			int GetPing();
 
 			void DoEvents(int timeout = 0);
+			void DoPackets(NetPacketReader &);
 
 			void SendJoin(int team, WeaponType, std::string name, int kills);
 			void SendPosition();
