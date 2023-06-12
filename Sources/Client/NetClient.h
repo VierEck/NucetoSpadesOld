@@ -87,6 +87,14 @@ namespace spades {
 
 			std::unique_ptr<BandwidthMonitor> bandwidthMonitor;
 
+			struct {
+				std::unique_ptr<IStream> stream;
+				std::vector<char> data;
+
+				float start_time;
+				float delta_time;
+			} demo;
+
 			std::vector<Vector3> savedPlayerPos;
 			std::vector<Vector3> savedPlayerFront;
 			std::vector<int> savedPlayerTeam;
@@ -162,7 +170,7 @@ namespace spades {
 			double GetDownlinkBps() { return bandwidthMonitor->GetDownlinkBps(); }
 			double GetUplinkBps() { return bandwidthMonitor->GetUplinkBps(); }
 
-			FILE* HandleDemoFile(std::string, bool replay);
+			IStream* HandleDemoStream(std::string, bool replay);
 			void RegisterDemoPacket(ENetPacket *packet);
 			void DemoStart(std::string, bool replay);
 			void DemoStop();
@@ -199,12 +207,6 @@ namespace spades {
 			bool PrevUps;
 			void DemoCommandPrevUps(int ups);
 			void DemoCountUps();
-		};
-		struct Demo {
-			FILE* fp;
-			float start_time;
-			float delta_time;
-			std::vector<char> data;
 		};
 	}
 }

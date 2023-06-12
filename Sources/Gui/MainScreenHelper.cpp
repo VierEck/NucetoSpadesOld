@@ -115,24 +115,23 @@ namespace spades {
 		gameMode = " ";
 		country = " ";
 
-		FILE *file;
-		file = fopen(("Demos/" + file_name).c_str(), "rb");
-		unsigned char value;
-		fread(&value, sizeof(value), 1, file);
-		if (value == 1) {
-			map = " ";
+		IStream *file = FileManager::OpenForReading(("Demos/" + file_name).c_str());
+		unsigned char val;
+		file->Read(&val, sizeof(val));
+		if (val == 1) {
+			map = "";
 		} else {
 			map = "invalid aos_replay version";
 		}
-		fread(&value, sizeof(value), 1, file);
-		if (value == 3) {
+
+		file->Read(&val, sizeof(val));
+		if (val == 3) {
 			version = "0.75";
-		} else if (value == 4) {
+		} else if (val == 4) {
 			version = "0.76";
 		} else {
 			version = "invalid";
 		}
-		fclose(file);
 
 		item = new ServerItem(name, ip, map, gameMode, country, version, ping, players, maxPlayers);
 		
@@ -174,28 +173,13 @@ namespace spades {
 
 			void GetDemoList() {
 				std::unique_ptr<MainScreenServerList> resp{new MainScreenServerList()};
-				std::string path = "/Demos/";
 
-				WIN32_FIND_DATA FileInfo;
-				std::vector<std::string> FileNames;
+				std::vector<std::string> FileNames = FileManager::EnumFiles("Demos/");
+				for (auto file : FileNames) {
+					if (file.substr(file.size() - 5, 5) != ".demo")
+						continue;
 
-				char buffer[MAX_PATH];
-				GetModuleFileNameA(NULL, buffer, MAX_PATH);
-				std::string::size_type pos = std::string(buffer).find_last_of("\\/");
-				std::string fullPath = std::string(buffer).substr(0, pos) + "\\Demos" + "/*.demo";
-
-			    HANDLE hFind = ::FindFirstFile(fullPath.c_str(), &FileInfo); 
-			    if(hFind != INVALID_HANDLE_VALUE) { 
-			        do {
-			            if(!(FileInfo.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
-			                FileNames.push_back(FileInfo.cFileName);
-			            }
-			        }while(::FindNextFile(hFind, &FileInfo)); 
-			        ::FindClose(hFind); 
-			    } 
-
-				for (int i = 0; i < (int)FileNames.size(); i++) {
-					std::unique_ptr<ServerItem> srv{ServerItem::MakeDemoItem(FileNames[i])};
+					std::unique_ptr<ServerItem> srv{ServerItem::MakeDemoItem(file)};
 
 					if (srv) {
 						resp->list.emplace_back(new MainScreenServerItem(srv.get(), owner->favorites.count(srv->GetAddress()) >= 1),false);
