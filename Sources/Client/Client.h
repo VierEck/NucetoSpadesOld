@@ -491,7 +491,7 @@ namespace spades {
 			void PlayerCoords();
 			bool hitTestSizeToggle;
 
-			float GetTimeGlobal() { return time; }
+			float GetTimeClient() { return time; }
 
 			bool Replaying;
 			std::string demo_file;

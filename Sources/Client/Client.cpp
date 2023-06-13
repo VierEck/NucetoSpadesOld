@@ -426,7 +426,7 @@ namespace spades {
 				SPLog("Failed to open netlog file '%s' (%s)", fn2.c_str(), ex.what());
 			}
 
-			if (cg_DemoRecord)
+			if ((bool)cg_DemoRecord)
 				net->DemoStart(demo, false);
 		}
 

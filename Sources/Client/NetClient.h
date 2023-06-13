@@ -87,14 +87,6 @@ namespace spades {
 
 			std::unique_ptr<BandwidthMonitor> bandwidthMonitor;
 
-			struct {
-				std::unique_ptr<IStream> stream;
-				std::vector<char> data;
-
-				float start_time;
-				float delta_time;
-			} demo;
-
 			std::vector<Vector3> savedPlayerPos;
 			std::vector<Vector3> savedPlayerFront;
 			std::vector<int> savedPlayerTeam;
@@ -124,6 +116,57 @@ namespace spades {
 
 			void SendVersion();
 			void SendVersionEnhanced(const std::set<std::uint8_t> &propertyIds);
+
+			struct {
+				std::unique_ptr<IStream> stream;
+				std::vector<char> data;
+
+				float startTime;
+				float deltaTime;
+
+				std::string endTimeStr;
+
+				bool started;
+
+				bool paused;
+				bool pauseAfterSkip;
+				
+				int skipTime;
+				float skipTimeEnd;
+				bool skippingMap;
+
+				int nextUps;
+				int countUps;
+				bool isPrevUps;
+
+				int followId;
+				bool followState;
+				bool firstJoin;
+			} demo;
+
+			IStream* HandleDemoStream(std::string, bool replay);
+			void RegisterDemoPacket(ENetPacket *packet);
+			void ReadNextDemoPacket();
+			void DemoStop();
+
+			void joinReplay();
+			void DemoSkipMap();
+			void DemoSetFollow();
+
+			void DemoCommands(std::string command);
+			int DemoStringToInt(std::string integer);
+
+			void DemoCommandPause();
+			void DemoCommandUnpause(bool skipped);
+
+			void DemoCommandFF(int seconds);
+			void DemoCommandBB(int seconds);
+			void DemoCommandGT(std::string delta);
+			void DemoCommandSP(float speed);
+
+			void DemoCommandNextUps(int ups);
+			void DemoCommandPrevUps(int ups);
+			void DemoCountUps();
 
 		public:
 			NetClient(Client *, bool replay);
@@ -170,43 +213,17 @@ namespace spades {
 			double GetDownlinkBps() { return bandwidthMonitor->GetDownlinkBps(); }
 			double GetUplinkBps() { return bandwidthMonitor->GetUplinkBps(); }
 
-			IStream* HandleDemoStream(std::string, bool replay);
-			void RegisterDemoPacket(ENetPacket *packet);
-			void DemoStart(std::string, bool replay);
-			void DemoStop();
-			bool DemoStarted = false;
-
-			void joinReplay();
-			void ReadNextDemoPacket();
 			void DoDemo();
-			bool DemoSkippingMap;
-			int GetDemoTimer();
-			std::string demo_end_time;
-			int demo_skip_time;
-			void DemoSkipMap();
-			bool DemoFirstJoined;
-			void DemoSetFollow();
-
-			void DemoCommands(std::string command);
-			void DemoCommandPause();
-			bool DemoPaused;
-			bool PauseDemoAfterSkip;
-			void DemoCommandUnpause(bool skipped);
-
-			void DemoCommandFF(int seconds);
-			void DemoCommandBB(int seconds);
-			void DemoCommandGT(std::string delta);
-			float demo_skip_end_time;
-
-			void DemoCommandSP(float speed);
-			int DemoStringToInt(std::string integer);
-			std::pair<int, bool> DemoFollowState;
-			void DemoCommandNextUps(int ups);
-			int demo_next_ups;
-			int demo_count_ups;
-			bool PrevUps;
-			void DemoCommandPrevUps(int ups);
-			void DemoCountUps();
+			void DemoStart(std::string, bool replay);
+			bool IsDemoPaused() { return demo.paused; }
+			int GetSkipTime() { return demo.skipTime; }
+			int GetDemoTimer() { return (int)demo.deltaTime; }
+			std::string GetDemoEnd() { return demo.endTimeStr; }
+			bool IsFirstJoin() {
+				bool b = demo.firstJoin; 
+				demo.firstJoin = false; 
+				return b;
+			}
 		};
 	}
 }
