@@ -491,15 +491,19 @@ namespace spades {
 			void PlayerCoords();
 			bool hitTestSizeToggle;
 
+			float SpeedMultiplier;
 			float GetTimeClient() { return time; }
+			float ClientTimeMultiplied() { return time * SpeedMultiplier; }
+			float GetSpeedMultiplier() { return SpeedMultiplier;}
+			void SetSpeedMultiplier(float speed) { SpeedMultiplier = speed; }
 
 			bool Replaying;
 			std::string demo_file;
+
 			void SetFollowedPlayerId(int i) { followedPlayerId = i; }
 			int GetFollowedPlayerId() { return followedPlayerId; }
 			bool GetFollowMode() { return followCameraState.enabled; }
 			void SetFollowMode(bool enable) { followCameraState.enabled = enable; }
-			float DemoSpeedMultiplier;
 		};
 	}
 }

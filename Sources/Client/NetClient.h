@@ -120,24 +120,16 @@ namespace spades {
 			struct {
 				std::unique_ptr<IStream> stream;
 				std::vector<char> data;
-
 				float startTime;
 				float deltaTime;
 
+				float endTime;
 				std::string endTimeStr;
 
-				bool started;
-
+				bool recording;
 				bool paused;
-				bool pauseAfterSkip;
-				
-				int skipTime;
-				float skipTimeEnd;
-				bool skippingMap;
 
-				int nextUps;
 				int countUps;
-				bool isPrevUps;
 
 				int followId;
 				bool followState;
@@ -149,20 +141,21 @@ namespace spades {
 			void ReadNextDemoPacket();
 			void DemoStop();
 
+			void SkimDemo();
+			bool CheckIgnoreType(int type);
+
 			void joinReplay();
-			void DemoSkipMap();
 			void DemoSetFollow();
+			void DemoSkipMap();
+
+			void DemoSkip(float sec);
+			void DemoPause(bool unpause = false);
+			void DemoSpeed(float speed);
+			void DemoUps(int ups);
 
 			void DemoCommands(std::string command);
 			int DemoStringToInt(std::string integer);
-
-			void DemoCommandPause();
-			void DemoCommandUnpause(bool skipped);
-
-			void DemoCommandFF(int seconds);
-			void DemoCommandBB(int seconds);
-			void DemoCommandGT(std::string delta);
-			void DemoCommandSP(float speed);
+			void DemoCommandGoto(std::string delta);
 
 			void DemoCommandNextUps(int ups);
 			void DemoCommandPrevUps(int ups);
@@ -216,7 +209,6 @@ namespace spades {
 			void DoDemo();
 			void DemoStart(std::string, bool replay);
 			bool IsDemoPaused() { return demo.paused; }
-			int GetSkipTime() { return demo.skipTime; }
 			int GetDemoTimer() { return (int)demo.deltaTime; }
 			std::string GetDemoEnd() { return demo.endTimeStr; }
 			bool IsFirstJoin() {

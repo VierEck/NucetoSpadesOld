@@ -198,7 +198,7 @@ namespace spades {
 			// physics diverges from server
 			world->Advance(dt);
 #else
-			if (!Replaying || (Replaying && (!net->IsDemoPaused() || net->GetSkipTime() != 0))) {
+			if (!Replaying || (Replaying && !net->IsDemoPaused())) {
 				// accurately resembles server's physics
 				// but not smooth
 				if (dt > 0.f)
@@ -206,7 +206,7 @@ namespace spades {
 
 				float frameStep = 1.f / 60.f;
 				while (worldSubFrame >= frameStep) {
-					world->Advance(frameStep * DemoSpeedMultiplier);
+					world->Advance(frameStep * SpeedMultiplier);
 					worldSubFrame -= frameStep;
 				}
 			}
