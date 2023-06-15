@@ -1973,18 +1973,7 @@ namespace spades {
 						
 				}
 
-				unsigned short len;
-				while (stream->Read(&demo.endTime, sizeof(demo.endTime)) == sizeof(demo.endTime)) {
-					stream->Read(&len, sizeof(len));
-					stream->SetPosition(stream->GetPosition() + (uint64_t)len);
-				}
-				stream->SetPosition(2);
-				int hour = (int)demo.endTime / 3600;
-				int min  = ((int)demo.endTime % 3600) / 60;
-				int sec  = (int)demo.endTime % 60;
-				char buf[256];
-				sprintf(buf, "%02d:%02d:%02d", hour, min, sec);
-				demo.endTimeStr = buf;
+				ScanDemo(stream);
 
 				savedPackets.clear();
 
@@ -1996,6 +1985,30 @@ namespace spades {
 			}
 		
 			return stream;
+		}
+
+		void NetClient::ScanDemo(IStream* stream) {
+			demo.endUps = 0;
+
+			unsigned short len;
+			unsigned char type;
+			while (stream->Read(&demo.endTime, sizeof(demo.endTime)) == sizeof(demo.endTime)) {
+				stream->Read(&len, sizeof(len));
+				stream->Read(&type, sizeof(type));
+				stream->SetPosition(stream->GetPosition() + (uint64_t)len - (uint64_t)sizeof(type));
+
+				if (type == PacketTypeWorldUpdate) {
+					demo.endUps++;
+				}
+			}
+			stream->SetPosition(2);
+
+			int hour = (int)demo.endTime / 3600;
+			int min  = ((int)demo.endTime % 3600) / 60;
+			int sec  = (int)demo.endTime % 60;
+			char buf[256];
+			sprintf(buf, "%02d:%02d:%02d", hour, min, sec);
+			demo.endTimeStr = buf;
 		}
 
 		void NetClient::RegisterDemoPacket(ENetPacket *packet) {
@@ -2172,8 +2185,13 @@ namespace spades {
 			DemoSaveFollow();
 
 			int skipToUps = demo.countUps + ups;
-			if (skipToUps < 0) {
+			if (skipToUps > demo.endUps) {
+				skipToUps = demo.endUps;
+			} else if (skipToUps < 0) {
 				skipToUps = 0;
+			}
+			if (skipToUps == demo.countUps) {
+				return;
 			}
 			if (ups < 0) {
 				demo.stream->SetPosition(2);
@@ -2266,8 +2284,7 @@ namespace spades {
 			demo.startTime = client->ClientTimeMultiplied() - demo.deltaTime;
 			joinReplay();
 			if (demo.paused) {
-				float frameStep = 1.f / 60.f;
-				GetWorld()->Advance(frameStep);
+				GetWorld()->Advance(0);
 			}
 			demo.skimming = false;
 		}

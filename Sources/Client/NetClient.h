@@ -130,6 +130,7 @@ namespace spades {
 				bool paused;
 				bool skimming;
 
+				int endUps;
 				int countUps;
 
 				int followId;
@@ -138,6 +139,7 @@ namespace spades {
 			} demo;
 
 			IStream* HandleDemoStream(std::string, bool replay);
+			void ScanDemo(IStream* stream);
 			void RegisterDemoPacket(ENetPacket *packet);
 			void ReadNextDemoPacket();
 			void ReadDemoCurrentData();
