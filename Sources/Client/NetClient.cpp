@@ -120,6 +120,8 @@ namespace spades {
 				}
 			} ignore;
 
+			std::vector<std::pair<float, int64_t>> scannedMapStarts;
+
 			enum class VersionInfoPropertyId : std::uint8_t {
 				ApplicationNameAndVersion = 0,
 				UserLocale = 1,
@@ -1992,6 +1994,7 @@ namespace spades {
 
 			unsigned short len;
 			unsigned char type;
+			uint64_t pos = stream->GetPosition();
 			while (stream->Read(&demo.endTime, sizeof(demo.endTime)) == sizeof(demo.endTime)) {
 				stream->Read(&len, sizeof(len));
 				stream->Read(&type, sizeof(type));
@@ -2000,6 +2003,11 @@ namespace spades {
 				if (type == PacketTypeWorldUpdate) {
 					demo.endUps++;
 				}
+				if (type == PacketTypeMapStart) {
+					scannedMapStarts.push_back(std::make_pair(demo.endTime, pos));
+				}
+
+				pos = stream->GetPosition();
 			}
 			stream->SetPosition(2);
 
@@ -2142,16 +2150,15 @@ namespace spades {
 			DemoSaveFollow();
 
 			float skipToTime = demo.deltaTime + sec;
-			if (skipToTime < 0) {
-				skipToTime = 0;
-			}
 			if (skipToTime > demo.endTime) {
 				skipToTime = demo.endTime;
+			} else if (skipToTime < 0) {
+				skipToTime = 0;
 			}
-			if (sec < 0) {
-				demo.stream->SetPosition(2);
-				demo.deltaTime = demo.countUps =  0;
+			if (demo.deltaTime == skipToTime) {
+				return;
 			}
+			DemoSetSkimOfs(sec, skipToTime);
 
 			demo.skimming = true;
 			while (demo.deltaTime < skipToTime) {
@@ -2193,10 +2200,7 @@ namespace spades {
 			if (skipToUps == demo.countUps) {
 				return;
 			}
-			if (ups < 0) {
-				demo.stream->SetPosition(2);
-				demo.deltaTime = demo.countUps = 0;
-			}
+			DemoSetSkimOfs(ups, demo.deltaTime);
 
 			demo.skimming = true;
 			while (demo.countUps < skipToUps) {
@@ -2278,6 +2282,23 @@ namespace spades {
 		void NetClient::DemoSaveFollow() {
 			demo.followId = client->GetFollowedPlayerId();
 			demo.followState = client->GetFollowMode();
+		}
+
+		void NetClient::DemoSetSkimOfs(int sec_ups, float skipToTime) {
+			if (sec_ups < 0) {
+				demo.deltaTime = demo.countUps = 0;
+			}
+
+			//first=time, second=offset
+			int64_t pos = demo.stream->GetPosition();
+			for (auto mapStart : scannedMapStarts) {
+				if (demo.deltaTime <= mapStart.first <= skipToTime) {
+					pos = mapStart.second;
+					continue;
+				}
+				break;
+			}
+			demo.stream->SetPosition(pos);
 		}
 
 		void NetClient::DemoSkimEnd() {

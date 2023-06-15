@@ -154,6 +154,7 @@ namespace spades {
 			void joinReplay();
 			void DemoSetFollow();
 			void DemoSaveFollow();
+			void DemoSetSkimOfs(int sec_ups, float skipToTime);
 			void DemoSkimEnd();
 
 			void DemoCommands(std::string command);
