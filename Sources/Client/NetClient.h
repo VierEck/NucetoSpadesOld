@@ -142,7 +142,6 @@ namespace spades {
 			void DemoStop();
 
 			void SkimDemo();
-			bool CheckIgnoreType(int type);
 
 			void joinReplay();
 			void DemoSetFollow();

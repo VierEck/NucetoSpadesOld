@@ -108,6 +108,14 @@ namespace spades {
 					PacketTypeHandShakeInit,
 					PacketTypeVersionSend,
 				};
+				bool IsAlways(int type) {
+					auto end = std::end(ignore.always);
+					auto find = std::find(std::begin(ignore.always), end, type);
+					if (find != end) {
+						return true;
+					}
+					return false;
+				}
 			} ignore;
 
 			enum class VersionInfoPropertyId : std::uint8_t {
@@ -525,7 +533,7 @@ namespace spades {
 				stmp::optional<NetPacketReader> readerOrNone;
 
 				if (event.type == ENET_EVENT_TYPE_RECEIVE) {
-					if ((bool)cg_DemoRecord && demo.recording) {
+					if ((bool)cg_DemoRecord && demo.recording && !ignore.IsAlways(event.packet->data[0])) {
 						if (event.packet->data[0] != 15) {
 							RegisterDemoPacket(event.packet);
 						} else {
@@ -2053,16 +2061,16 @@ namespace spades {
 					throw;
 				}
 
+				if (ignore.IsAlways(demo.data[0])) {
+					return;
+				}
+
 				stmp::optional<NetPacketReader> readerOrNone;
 				readerOrNone.reset(demo.data);
 				NetPacketReader &reader = readerOrNone.value();
 
 				if (reader.GetType() == PacketTypeWorldUpdate) {
 					demo.countUps++;
-				}
-
-				if (CheckIgnoreType(reader.GetType())) {
-					continue;
 				}
 
 				try {
@@ -2083,6 +2091,10 @@ namespace spades {
 				SPRaise("Error reading demo file");
 			}
 
+			if (ignore.IsAlways(demo.data[0])) {
+				return;
+			}
+
 			stmp::optional<NetPacketReader> readerOrNone;
 			readerOrNone.reset(demo.data);
 			NetPacketReader &reader = readerOrNone.value();
@@ -2091,24 +2103,11 @@ namespace spades {
 				demo.countUps++;
 			}
 
-			if (CheckIgnoreType(reader.GetType())) {
-				return;
-			}
-
 			try {
 				DoPackets(reader);
 			} catch (...) {
 				SPRaise("Error handling demo packet"); 
 			}
-		}
-
-		bool NetClient::CheckIgnoreType(int type) {
-			auto end = std::end(ignore.always);
-			auto find = std::find(std::begin(ignore.always), end, type);
-			if (find != end) {
-				return true;
-			}
-			return false;
 		}
 
 		void NetClient::joinReplay() {
@@ -2161,16 +2160,16 @@ namespace spades {
 					SPRaise("Error reading demo file");
 				}
 
+				if (ignore.IsAlways(demo.data[0])) {
+					return;
+				}
+
 				stmp::optional<NetPacketReader> readerOrNone;
 				readerOrNone.reset(demo.data);
 				NetPacketReader &reader = readerOrNone.value();
 
 				if (reader.GetType() == PacketTypeWorldUpdate) {
 					demo.countUps++;
-				}
-
-				if (CheckIgnoreType(reader.GetType())) {
-					continue;
 				}
 
 				try {
