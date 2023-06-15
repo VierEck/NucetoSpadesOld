@@ -592,6 +592,9 @@ namespace spades {
 
 		/** Records chat message/game events to the log file. */
 		void Client::NetLog(const char *format, ...) {
+			if (Replaying) {
+				return;
+			}
 			char buf[4096];
 			va_list va;
 			va_start(va, format);
