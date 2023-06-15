@@ -2152,6 +2152,7 @@ namespace spades {
 			demo.followId = client->GetFollowedPlayerId();
 			demo.followState = client->GetFollowMode();
 
+			demo.skimming = true;
 			int type = -1;
 			while (type != PacketTypeStateData) {
 				try {
@@ -2187,6 +2188,7 @@ namespace spades {
 				float frameStep = 1.f / 60.f;
 				GetWorld()->Advance(frameStep);
 			}
+			demo.skimming = false;
 		}
 
 		void NetClient::DemoSkip(float sec) {
@@ -2208,6 +2210,7 @@ namespace spades {
 				demo.deltaTime = demo.countUps =  0;
 			}
 
+			demo.skimming = true;
 			while (demo.deltaTime < skipToTime) {
 				try {
 					SkimDemo();
@@ -2227,6 +2230,7 @@ namespace spades {
 				float frameStep = 1.f / 60.f;
 				GetWorld()->Advance(frameStep);
 			}
+			demo.skimming = false;
 		}
 
 		void NetClient::DemoPause(bool unpause) {
@@ -2264,6 +2268,7 @@ namespace spades {
 				demo.deltaTime = demo.countUps = 0;
 			}
 
+			demo.skimming = true;
 			while (demo.countUps < skipToUps) {
 				try {
 					SkimDemo();
@@ -2283,6 +2288,7 @@ namespace spades {
 				float frameStep = 1.f / 60.f;
 				GetWorld()->Advance(frameStep);
 			}
+			demo.skimming = false;
 		}
 
 		void NetClient::DemoCommands(std::string command) {

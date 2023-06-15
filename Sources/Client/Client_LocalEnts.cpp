@@ -136,6 +136,9 @@ namespace spades {
 		bool Client::IsMuted() {
 			// prevent to play loud sound at connection
 			// caused by saved packets
+			if (Replaying) {
+				return net->IsDemoSkimming();
+			}
 			return time < worldSetTime + .05f;
 		}
 

@@ -128,6 +128,7 @@ namespace spades {
 
 				bool recording;
 				bool paused;
+				bool skimming;
 
 				int countUps;
 
@@ -208,6 +209,7 @@ namespace spades {
 			void DoDemo();
 			void DemoStart(std::string, bool replay);
 			bool IsDemoPaused() { return demo.paused; }
+			bool IsDemoSkimming() { return demo.skimming; }
 			int GetDemoTimer() { return (int)demo.deltaTime; }
 			std::string GetDemoEnd() { return demo.endTimeStr; }
 			bool IsFirstJoin() {
