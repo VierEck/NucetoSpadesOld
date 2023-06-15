@@ -97,7 +97,7 @@ namespace spades {
 			};
 
 			struct {
-				std::array<int, 7> always = { 
+				std::array<int, 9> always = { 
 					PacketTypePositionData,
 					PacketTypeOrientationData,
 
@@ -106,6 +106,8 @@ namespace spades {
 					PacketTypeRestock,
 
 					PacketTypeHandShakeInit,
+					PacketTypeHandShakeReturn,
+					PacketTypeVersionGet,
 					PacketTypeVersionSend,
 				};
 				bool IsAlways(int type) {
@@ -533,14 +535,16 @@ namespace spades {
 				stmp::optional<NetPacketReader> readerOrNone;
 
 				if (event.type == ENET_EVENT_TYPE_RECEIVE) {
-					if ((bool)cg_DemoRecord && demo.recording && !ignore.IsAlways(event.packet->data[0])) {
-						if (event.packet->data[0] != 15) {
-							RegisterDemoPacket(event.packet);
-						} else {
-							int player_id = event.packet->data[1];
-							event.packet->data[1] = 33;
-							RegisterDemoPacket(event.packet);
-							event.packet->data[1] = player_id;
+					if ((bool)cg_DemoRecord && demo.recording) {
+						if (!ignore.IsAlways(event.packet->data[0])) {
+							if (event.packet->data[0] != 15) {
+								RegisterDemoPacket(event.packet);
+							} else {
+								int player_id = event.packet->data[1];
+								event.packet->data[1] = 33;
+								RegisterDemoPacket(event.packet);
+								event.packet->data[1] = player_id;
+							}
 						}
 					} else if (demo.recording) {
 						DemoStop(); //stop if disable midgame. but cant enable midgame again
