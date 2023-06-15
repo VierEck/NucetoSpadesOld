@@ -140,18 +140,19 @@ namespace spades {
 			IStream* HandleDemoStream(std::string, bool replay);
 			void RegisterDemoPacket(ENetPacket *packet);
 			void ReadNextDemoPacket();
+			void ReadDemoCurrentData();
 			void DemoStop();
 
-			void SkimDemo();
+			void DemoSkipMap();
+			void DemoSkip(float sec);
+			void DemoUps(int ups);
+			void DemoPause(bool unpause = false);
+			void DemoSpeed(float speed);
 
 			void joinReplay();
 			void DemoSetFollow();
-			void DemoSkipMap();
-
-			void DemoSkip(float sec);
-			void DemoPause(bool unpause = false);
-			void DemoSpeed(float speed);
-			void DemoUps(int ups);
+			void DemoSaveFollow();
+			void DemoSkimEnd();
 
 			void DemoCommands(std::string command);
 			int DemoStringToInt(std::string integer);
@@ -208,10 +209,12 @@ namespace spades {
 
 			void DoDemo();
 			void DemoStart(std::string, bool replay);
-			bool IsDemoPaused() { return demo.paused; }
-			bool IsDemoSkimming() { return demo.skimming; }
+
 			int GetDemoTimer() { return (int)demo.deltaTime; }
 			std::string GetDemoEnd() { return demo.endTimeStr; }
+
+			bool IsDemoPaused() { return demo.paused; }
+			bool IsDemoSkimming() { return demo.skimming; }
 			bool IsFirstJoin() {
 				bool b = demo.firstJoin; 
 				demo.firstJoin = false; 

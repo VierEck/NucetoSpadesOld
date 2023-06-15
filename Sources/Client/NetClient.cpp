@@ -2054,6 +2054,22 @@ namespace spades {
 			demo.stream->Read(demo.data.data(), demo.data.size());
 		}
 
+		void NetClient::ReadDemoCurrentData() {
+			stmp::optional<NetPacketReader> readerOrNone;
+			readerOrNone.reset(demo.data);
+			NetPacketReader &reader = readerOrNone.value();
+
+			if (reader.GetType() == PacketTypeWorldUpdate) {
+				demo.countUps++;
+			}
+
+			try {
+				DoPackets(reader);
+			} catch (...) {
+				throw; //idk
+			}
+		}
+
 		void NetClient::DoDemo() {
 			if (demo.paused)
 				return;
@@ -2069,18 +2085,10 @@ namespace spades {
 					return;
 				}
 
-				stmp::optional<NetPacketReader> readerOrNone;
-				readerOrNone.reset(demo.data);
-				NetPacketReader &reader = readerOrNone.value();
-
-				if (reader.GetType() == PacketTypeWorldUpdate) {
-					demo.countUps++;
-				}
-
 				try {
-					DoPackets(reader);
+					ReadDemoCurrentData();
 				} catch (...) {
-					throw; //idk
+					throw;
 				}
 			}
 			if (status == NetClientStatusReceivingMap) {
@@ -2088,73 +2096,8 @@ namespace spades {
 			}
 		}
 
-		void NetClient::SkimDemo() {
-			try {
-				ReadNextDemoPacket();
-			} catch (...) {
-				SPRaise("Error reading demo file");
-			}
-
-			if (ignore.IsAlways(demo.data[0])) {
-				return;
-			}
-
-			stmp::optional<NetPacketReader> readerOrNone;
-			readerOrNone.reset(demo.data);
-			NetPacketReader &reader = readerOrNone.value();
-
-			if (reader.GetType() == PacketTypeWorldUpdate) {
-				demo.countUps++;
-			}
-
-			try {
-				DoPackets(reader);
-			} catch (...) {
-				SPRaise("Error handling demo packet"); 
-			}
-		}
-
-		void NetClient::joinReplay() {
-			SPADES_SETTING(cg_playerName);
-			GetWorld()->SetLocalPlayerIndex(33);
-
-			NetPacketWriter wri(PacketTypeExistingPlayer);
-			wri.Write((uint8_t)33);
-			wri.Write((uint8_t)255);
-			wri.Write((uint8_t)0);
-			wri.Write((uint8_t)2);
-			wri.Write((uint32_t)0);
-			wri.WriteColor(GetWorld()->GetTeam(255).color);
-			wri.Write((std::string)cg_playerName, 16);
-			NetPacketReader read(wri.CreatePacket());
-
-			HandleGamePacket(read);
-			DemoSetFollow();
-		}
-
-		void NetClient::DemoSetFollow() {
-			if (demo.firstJoin)
-				return;
-			if (status == NetClientStatusReceivingMap)
-				return;
-			if (!GetWorld())
-				return;
-			if (!GetPlayerOrNull(demo.followId))
-				return;
-
-			Player *p = GetWorld()->GetPlayer(demo.followId);
-			if (p->IsSpectator())
-				return;
-			if (p->GetFront().GetPoweredLength() < .01f)
-				return;
-
-			client->SetFollowedPlayerId(demo.followId);
-			client->SetFollowMode(demo.followState);
-		}
-
 		void NetClient::DemoSkipMap() {
-			demo.followId = client->GetFollowedPlayerId();
-			demo.followState = client->GetFollowMode();
+			DemoSaveFollow();
 
 			demo.skimming = true;
 			int type = -1;
@@ -2165,42 +2108,25 @@ namespace spades {
 					SPRaise("Error reading demo file");
 				}
 
-				if (ignore.IsAlways(demo.data[0])) {
-					return;
-				}
-
-				stmp::optional<NetPacketReader> readerOrNone;
-				readerOrNone.reset(demo.data);
-				NetPacketReader &reader = readerOrNone.value();
-
-				if (reader.GetType() == PacketTypeWorldUpdate) {
-					demo.countUps++;
+				type = demo.data[0];
+				if (ignore.IsAlways(type)) {
+					continue;
 				}
 
 				try {
-					DoPackets(reader);
+					ReadDemoCurrentData();
 				} catch (...) {
 					SPRaise("Error handling demo packet"); 
 				}
-
-				type = reader.GetType();
 			}
-			demo.startTime = client->ClientTimeMultiplied() - demo.deltaTime;
-
-			joinReplay();
-			if (demo.paused) {
-				float frameStep = 1.f / 60.f;
-				GetWorld()->Advance(frameStep);
-			}
-			demo.skimming = false;
+			DemoSkimEnd();
 		}
 
 		void NetClient::DemoSkip(float sec) {
 			if (sec == 0)
 				return;
 
-			demo.followId = client->GetFollowedPlayerId();
-			demo.followState = client->GetFollowMode();
+			DemoSaveFollow();
 
 			float skipToTime = demo.deltaTime + sec;
 			if (skipToTime < 0) {
@@ -2217,24 +2143,66 @@ namespace spades {
 			demo.skimming = true;
 			while (demo.deltaTime < skipToTime) {
 				try {
-					SkimDemo();
+					ReadNextDemoPacket();
 				} catch (...) {
-					demo.paused = false;
-					return;
+					SPRaise("Error reading demo file");
+				}
+
+				if (ignore.IsAlways(demo.data[0])) {
+					continue;
+				}
+
+				try {
+					ReadDemoCurrentData();
+				} catch (...) {
+					SPRaise("Error handling demo packet"); 
 				}
 			}
 			if (status == NetClientStatusReceivingMap) {
 				DemoSkipMap();
 				return;
 			}
-			demo.startTime = client->ClientTimeMultiplied() - demo.deltaTime;
+			DemoSkimEnd();
+		}
 
-			joinReplay();
-			if (demo.paused) {
-				float frameStep = 1.f / 60.f;
-				GetWorld()->Advance(frameStep);
+		void NetClient::DemoUps(int ups) {
+			if (ups == 0 || !demo.paused)
+				return;
+
+			DemoSaveFollow();
+
+			int skipToUps = demo.countUps + ups;
+			if (skipToUps < 0) {
+				skipToUps = 0;
 			}
-			demo.skimming = false;
+			if (ups < 0) {
+				demo.stream->SetPosition(2);
+				demo.deltaTime = demo.countUps = 0;
+			}
+
+			demo.skimming = true;
+			while (demo.countUps < skipToUps) {
+				try {
+					ReadNextDemoPacket();
+				} catch (...) {
+					SPRaise("Error reading demo file");
+				}
+
+				if (ignore.IsAlways(demo.data[0])) {
+					continue;
+				}
+
+				try {
+					ReadDemoCurrentData();
+				} catch (...) {
+					SPRaise("Error handling demo packet"); 
+				}
+			}
+			if (status == NetClientStatusReceivingMap) {
+				DemoSkipMap();
+				return;
+			}
+			DemoSkimEnd();
 		}
 
 		void NetClient::DemoPause(bool unpause) {
@@ -2254,39 +2222,48 @@ namespace spades {
 			demo.startTime = client->ClientTimeMultiplied() - demo.deltaTime;
 		}
 
-		void NetClient::DemoUps(int ups) {
-			if (ups == 0)
+		void NetClient::joinReplay() {
+			if (!GetLocalPlayerOrNull()) {
+				GetWorld()->SetLocalPlayerIndex(33);
+				Player *p = new Player(GetWorld(), 33, RIFLE_WEAPON, 2, MakeVector3(255, 255, 255), GetWorld()->GetTeam(2).color);
+				GetWorld()->SetPlayer(33, p);
+				savedPlayerTeam[33] = 2;
+
+				SPADES_SETTING(cg_playerName);
+				World::PlayerPersistent &pers = GetWorld()->GetPlayerPersistent(33);
+				pers.name = (std::string)cg_playerName;
+			}
+
+			DemoSetFollow();
+		}
+
+		void NetClient::DemoSetFollow() {
+			if (demo.firstJoin)
 				return;
-			if (!demo.paused)
+			if (status != NetClientStatusConnected)
+				return;
+			if (!GetWorld())
+				return;
+			if (!GetPlayerOrNull(demo.followId))
 				return;
 
+			Player *p = GetWorld()->GetPlayer(demo.followId);
+			if (p->IsSpectator())
+				return;
+			if (p->GetFront().GetPoweredLength() < .01f)
+				return;
+
+			client->SetFollowedPlayerId(demo.followId);
+			client->SetFollowMode(demo.followState);
+		}
+
+		void NetClient::DemoSaveFollow() {
 			demo.followId = client->GetFollowedPlayerId();
 			demo.followState = client->GetFollowMode();
+		}
 
-			int skipToUps = demo.countUps + ups;
-			if (skipToUps < 0) {
-				skipToUps = 0;
-			}
-			if (ups < 0) {
-				demo.stream->SetPosition(2);
-				demo.deltaTime = demo.countUps = 0;
-			}
-
-			demo.skimming = true;
-			while (demo.countUps < skipToUps) {
-				try {
-					SkimDemo();
-				} catch (...) {
-					demo.paused = false;
-					return;
-				}
-			}
-			if (status == NetClientStatusReceivingMap) {
-				DemoSkipMap();
-				return;
-			}
+		void NetClient::DemoSkimEnd() {
 			demo.startTime = client->ClientTimeMultiplied() - demo.deltaTime;
-
 			joinReplay();
 			if (demo.paused) {
 				float frameStep = 1.f / 60.f;
