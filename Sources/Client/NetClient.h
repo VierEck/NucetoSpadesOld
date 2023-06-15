@@ -157,7 +157,7 @@ namespace spades {
 			void joinReplay();
 			void DemoSetFollow();
 			void DemoSaveFollow();
-			bool DemoSkimIgnoreType(int type);
+			bool DemoSkimIgnoreType(int type, float skipToTime);
 			void DemoSkimReadLastFogWorld();
 			void DemoSetSkimOfs(int sec_ups, float skipToTime);
 			void DemoSkimEnd();

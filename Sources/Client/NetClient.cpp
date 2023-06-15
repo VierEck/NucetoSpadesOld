@@ -2130,7 +2130,7 @@ namespace spades {
 				}
 
 				type = demo.data[0];
-				if (DemoSkimIgnoreType(type)) {
+				if (DemoSkimIgnoreType(type, demo.deltaTime)) {
 					continue;
 				}
 
@@ -2160,7 +2160,10 @@ namespace spades {
 			}
 			DemoSetSkimOfs(sec, skipToTime);
 
+			GetWorld()->Advance(skipToTime - demo.deltaTime);//update nades stuck in pause.
+
 			demo.skimming = true;
+			float beforeTime = demo.deltaTime;
 			while (demo.deltaTime < skipToTime) {
 				try {
 					ReadNextDemoPacket();
@@ -2168,7 +2171,12 @@ namespace spades {
 					SPRaise("Error reading demo file");
 				}
 
-				if (DemoSkimIgnoreType(demo.data[0])) {
+				if (GetWorld() && (skipToTime - demo.deltaTime) <= 3.0f) {
+					GetWorld()->Advance(demo.deltaTime - beforeTime);
+				}
+				beforeTime = demo.deltaTime;
+
+				if (DemoSkimIgnoreType(demo.data[0], skipToTime)) {
 					continue;
 				}
 
@@ -2202,7 +2210,10 @@ namespace spades {
 			}
 			DemoSetSkimOfs(ups, demo.deltaTime);
 
+			GetWorld()->Advance(ups / 60.f);//update nades stuck in pause. not accurate though
+
 			demo.skimming = true;
+			float beforeTime = demo.deltaTime;
 			while (demo.countUps < skipToUps) {
 				try {
 					ReadNextDemoPacket();
@@ -2210,7 +2221,12 @@ namespace spades {
 					SPRaise("Error reading demo file");
 				}
 
-				if (DemoSkimIgnoreType(demo.data[0])) {
+				if (GetWorld() && (ups * (1 - 2 * (ups < 0)) < 180)) {
+					GetWorld()->Advance(demo.deltaTime - beforeTime);
+				}
+				beforeTime = demo.deltaTime;
+
+				if (DemoSkimIgnoreType(demo.data[0], demo.deltaTime)) {
 					continue;
 				}
 
@@ -2284,7 +2300,7 @@ namespace spades {
 			demo.followState = client->GetFollowMode();
 		}
 
-		bool NetClient::DemoSkimIgnoreType(int type) {
+		bool NetClient::DemoSkimIgnoreType(int type, float skipToTime) {
 			if (ignore.IsAlways(type)) {
 				return true;
 			}
@@ -2292,6 +2308,14 @@ namespace spades {
 			if (type == PacketTypeWorldUpdate) {
 				demo.countUps++;
 				demo.lastWorldUpdate = demo.data;
+				return true;
+			}
+			if (type == PacketTypeGrenadePacket) {
+				float fuse = demo.data[2];
+				float fuseEnd = demo.deltaTime + fuse;
+				if (skipToTime <= fuseEnd) {
+					return false;
+				}
 				return true;
 			}
 			if (type == PacketTypeFogColour) {
