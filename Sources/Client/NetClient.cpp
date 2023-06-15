@@ -2130,7 +2130,7 @@ namespace spades {
 				}
 
 				type = demo.data[0];
-				if (ignore.IsAlways(type)) {
+				if (DemoSkimIgnoreType(type)) {
 					continue;
 				}
 
@@ -2168,7 +2168,7 @@ namespace spades {
 					SPRaise("Error reading demo file");
 				}
 
-				if (ignore.IsAlways(demo.data[0])) {
+				if (DemoSkimIgnoreType(demo.data[0])) {
 					continue;
 				}
 
@@ -2210,7 +2210,7 @@ namespace spades {
 					SPRaise("Error reading demo file");
 				}
 
-				if (ignore.IsAlways(demo.data[0])) {
+				if (DemoSkimIgnoreType(demo.data[0])) {
 					continue;
 				}
 
@@ -2284,6 +2284,42 @@ namespace spades {
 			demo.followState = client->GetFollowMode();
 		}
 
+		bool NetClient::DemoSkimIgnoreType(int type) {
+			if (ignore.IsAlways(type)) {
+				return true;
+			}
+
+			if (type == PacketTypeWorldUpdate) {
+				demo.countUps++;
+				demo.lastWorldUpdate = demo.data;
+				return true;
+			}
+			if (type == PacketTypeFogColour) {
+				demo.lastFogColour = demo.data;
+				return true;
+			}
+			if (type == PacketTypeStateData) {
+				demo.lastFogColour.clear();
+				return false;
+			}
+
+			return false;
+		}
+
+		void NetClient::DemoSkimReadLastFogWorld() {
+			if (demo.lastWorldUpdate.size() > 0) {
+				demo.data = demo.lastWorldUpdate;
+				ReadDemoCurrentData();
+			}
+			if (demo.lastFogColour.size() > 0) {
+				demo.data = demo.lastFogColour;
+				ReadDemoCurrentData();
+			}
+
+			demo.lastWorldUpdate.clear();
+			demo.lastFogColour.clear();
+		}
+
 		void NetClient::DemoSetSkimOfs(int sec_ups, float skipToTime) {
 			if (sec_ups < 0) {
 				demo.deltaTime = demo.countUps = 0;
@@ -2291,12 +2327,13 @@ namespace spades {
 
 			//first=time, second=offset
 			int64_t pos = demo.stream->GetPosition();
-			for (auto mapStart : scannedMapStarts) {
-				if (demo.deltaTime <= mapStart.first <= skipToTime) {
-					pos = mapStart.second;
+			for (auto &mapStart : scannedMapStarts) {
+				if (mapStart.first < demo.deltaTime)
 					continue;
-				}
-				break;
+				if (mapStart.first > skipToTime)
+					continue;
+
+				pos = mapStart.second;
 			}
 			demo.stream->SetPosition(pos);
 		}
@@ -2308,6 +2345,7 @@ namespace spades {
 				GetWorld()->Advance(0);
 			}
 			demo.skimming = false;
+			DemoSkimReadLastFogWorld();
 		}
 
 		void NetClient::DemoCommands(std::string command) {

@@ -126,12 +126,15 @@ namespace spades {
 				float endTime;
 				std::string endTimeStr;
 
+				int endUps;
+				int countUps;
+
 				bool recording;
 				bool paused;
 				bool skimming;
 
-				int endUps;
-				int countUps;
+				std::vector<char> lastWorldUpdate;
+				std::vector<char> lastFogColour;
 
 				int followId;
 				bool followState;
@@ -154,6 +157,8 @@ namespace spades {
 			void joinReplay();
 			void DemoSetFollow();
 			void DemoSaveFollow();
+			bool DemoSkimIgnoreType(int type);
+			void DemoSkimReadLastFogWorld();
 			void DemoSetSkimOfs(int sec_ups, float skipToTime);
 			void DemoSkimEnd();
 
