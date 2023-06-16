@@ -180,7 +180,7 @@ namespace spades {
 				return;
 			}
 
-			if (demoProgress.uiActive) {
+			if (demoProgress.uiActive && !scriptedUI->NeedsInput()) {
 				//-1 not hovering state
 				demoProgress.cursor.x = x;
 				demoProgress.cursor.y = y;
@@ -371,6 +371,9 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			if (Replaying && world) {
+				if (name == "Escape" && down) {
+					demoProgress.uiActive = false;
+				}
 				if (!scriptedUI->NeedsInput()) {
 					if (CheckKey(cg_keyPause, name) && down) {
 						net->DemoPause(net->IsDemoPaused());
@@ -406,13 +409,16 @@ namespace spades {
 					}
 				}
 				if (CheckKey(cg_KeyProgressUi, name) && down) {
-					demoProgress.uiActive = !demoProgress.uiActive;
-					if (demoProgress.uiActive && scriptedUI->NeedsInput()) {
-						scriptedUI->CloseUI(); //close ui
+					if (scriptedUI->NeedsInput()) {
+						scriptedUI->CloseUI();
+						demoProgress.uiActive = true;
+						return;
 					}
+					demoProgress.uiActive = !demoProgress.uiActive;
 					return;
 				}
-				if (demoProgress.uiActive && name == "LeftMouseButton" && down) {
+				if (demoProgress.uiActive && !scriptedUI->NeedsInput() &&
+					name == "LeftMouseButton" && down) {
 					if (demoProgress.skipTo >= -1.f) {
 						net->DemoSkip(demoProgress.skipTo - net->GetDemoTimer());
 					}
@@ -457,6 +463,7 @@ namespace spades {
 
 			if (name == "Escape") {
 				if (down) {
+					demoProgress.uiActive = false;
 					if (inGameLimbo) {
 						inGameLimbo = false;
 					} else {
