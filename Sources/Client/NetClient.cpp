@@ -548,8 +548,6 @@ namespace spades {
 								event.packet->data[1] = player_id;
 							}
 						}
-					} else if (demo.recording) {
-						DemoStop(); //stop if disable midgame. but cant enable midgame again
 					}
 
 					readerOrNone.reset(event.packet);
@@ -2037,7 +2035,7 @@ namespace spades {
 		void NetClient::DemoStart(std::string file_name, bool replay) {
 			demo.stream.reset(HandleDemoStream(file_name, replay));
 			demo.recording = !replay;
-			demo.startTime = client->ClientTimeMultiplied();
+			demo.startTime = client->GetTimeClient();
 			if (replay) {
 				demo.deltaTime = 0.0f;
 				demo.countUps = 0;

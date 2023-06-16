@@ -97,6 +97,8 @@ DEFINE_SPADES_SETTING(keyBind6, "F6");
 DEFINE_SPADES_SETTING(v_laser, "0");
 DEFINE_SPADES_SETTING(n_hitTestKey, "F8");
 
+SPADES_SETTING(cg_DemoRecord);
+
 namespace spades {
 	namespace client {
 
@@ -295,6 +297,9 @@ namespace spades {
 					if (!down) {
 						scriptedUI->setIgnored("");
 					}
+				}
+				if (net->IsDemoRecording() && !(bool)cg_DemoRecord) {
+					net->DemoStop();
 				}
 				return;
 			}

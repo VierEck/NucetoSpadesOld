@@ -146,7 +146,6 @@ namespace spades {
 			void RegisterDemoPacket(ENetPacket *packet);
 			void ReadNextDemoPacket();
 			void ReadDemoCurrentData();
-			void DemoStop();
 
 			void DemoSkipMap();
 			void DemoSkip(float sec);
@@ -217,10 +216,12 @@ namespace spades {
 
 			void DoDemo();
 			void DemoStart(std::string, bool replay);
+			void DemoStop();
 
 			int GetDemoTimer() { return (int)demo.deltaTime; }
 			std::string GetDemoEnd() { return demo.endTimeStr; }
 
+			bool IsDemoRecording() { return demo.recording; }
 			bool IsDemoPaused() { return demo.paused; }
 			bool IsDemoSkimming() { return demo.skimming; }
 			bool IsFirstJoin() {
