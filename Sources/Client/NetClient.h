@@ -148,10 +148,6 @@ namespace spades {
 			void ReadDemoCurrentData();
 
 			void DemoSkipMap();
-			void DemoSkip(float sec);
-			void DemoUps(int ups);
-			void DemoPause(bool unpause = false);
-			void DemoSpeed(float speed);
 
 			void joinReplay();
 			void DemoSetFollow();
@@ -164,10 +160,6 @@ namespace spades {
 			void DemoCommands(std::string command);
 			int DemoStringToInt(std::string integer);
 			void DemoCommandGoto(std::string delta);
-
-			void DemoCommandNextUps(int ups);
-			void DemoCommandPrevUps(int ups);
-			void DemoCountUps();
 
 		public:
 			NetClient(Client *, bool replay);
@@ -217,6 +209,11 @@ namespace spades {
 			void DoDemo();
 			void DemoStart(std::string, bool replay);
 			void DemoStop();
+
+			void DemoSkip(float sec);
+			void DemoUps(int ups);
+			void DemoPause(bool unpause = false);
+			void DemoSpeed(float speed);
 
 			int GetDemoTimer() { return (int)demo.deltaTime; }
 			std::string GetDemoEnd() { return demo.endTimeStr; }
