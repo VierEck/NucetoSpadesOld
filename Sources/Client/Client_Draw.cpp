@@ -953,6 +953,41 @@ namespace spades {
 			mapView->Draw();
 		}
 
+		void Client::DrawDemoProgress() {
+			if (!cg_stats || cg_hideHud)
+				return;
+			if (!Replaying)
+				return;
+
+			char buf[256];
+			std::string str;
+			float scrWidth = renderer->ScreenWidth();
+			float scrHeight = renderer->ScreenHeight();
+			IFont *font = fontManager->GetGuiFont();
+			float margin = 5.f;
+			float a = 1.f;
+			float a2 = 0.5f;
+
+			IRenderer *r = renderer;
+			auto size = font->Measure(str);
+			size += Vector2(margin * 2.f, margin * 2.f);
+
+			auto pos = (Vector2(scrWidth, scrHeight) - size) * Vector2(0.5f, 1.f);
+
+			int currenttime = net->GetDemoTimer();
+			int hour = (int)currenttime / 3600;
+			int min  = ((int)currenttime % 3600) / 60;
+			int sec  = (int)currenttime % 60;
+			sprintf(buf, "Demo: %02d:%02d:%02d / ", hour, min, sec);
+			str = buf + net->GetDemoEnd();
+			auto tsize = font->Measure(str);
+			tsize += Vector2(margin * 2.f, margin * 2.f);
+			auto tpos = (Vector2(scrWidth, scrHeight) - tsize) * Vector2(0.5f, 0.95f);
+			r->SetColorAlphaPremultiplied(Vector4(0.f, 0.f, 0.f, 0.5f));
+			r->DrawImage(nullptr, AABB2(tpos.x, tpos.y, tsize.x, tsize.y));
+			font->DrawShadow(str, tpos + Vector2(margin, margin), 1.f, Vector4(1.f, 1.f, 1.f, a), Vector4(0.f, 0.f, 0.f, a2));
+		}
+
 		void Client::DrawAlert() {
 			SPADES_MARK_FUNCTION();
 
@@ -1087,31 +1122,34 @@ namespace spades {
 					if (IsFirstPerson(GetCameraMode())) {
 						DrawFirstPersonHUD();
 					}
-				
 
-				if (p->GetTeamId() < 2) {
-					// player is not spectator
-
-					DrawHitTestDebugger();
-
-					if(n_PlayerCoord){
-					PlayerCoords();
+					if (Replaying) {
+						DrawDemoProgress();
 					}
+
+					if (p->GetTeamId() < 2) {
+						// player is not spectator
+
+						DrawHitTestDebugger();
+
+						if(n_PlayerCoord){
+						PlayerCoords();
+						}
 				
-					if(br_LuckView && p->IsAlive()){
-					luckView->Draw();
-					}
+						if(br_LuckView && p->IsAlive()){
+						luckView->Draw();
+						}
 					
-					if (p->IsAlive()) {
-						DrawJoinedAlivePlayerHUD();
+						if (p->IsAlive()) {
+							DrawJoinedAlivePlayerHUD();
+						} else {
+							DrawDeadPlayerHUD();
+							DrawSpectateHUD();
+						}
+					
 					} else {
-						DrawDeadPlayerHUD();
 						DrawSpectateHUD();
 					}
-					
-				} else {
-					DrawSpectateHUD();
-				}
 				}
 
 				if (!cg_hideHud) {
@@ -1263,22 +1301,7 @@ namespace spades {
 			r->DrawImage(nullptr, AABB2(pos.x, pos.y, size.x, size.y));
 			font->DrawShadow(str, pos + Vector2(margin, margin), 1.f, Vector4(1.f, 1.f, 1.f, a), Vector4(0.f, 0.f, 0.f, a2));
 
-			if (Replaying) {
-				int currenttime = net->GetDemoTimer();
-				int hour = (int)currenttime / 3600;
-				int min  = ((int)currenttime % 3600) / 60;
-				int sec  = (int)currenttime % 60;
-				sprintf(buf, "Demo: %02d:%02d:%02d / ", hour, min, sec);
-				str = buf + net->GetDemoEnd();
-				auto tsize = font->Measure(str);
-				tsize += Vector2(margin * 2.f, margin * 2.f);
-				auto tpos = (Vector2(scrWidth, scrHeight) - tsize) * Vector2(0.5f, 0.95f);
-				r->SetColorAlphaPremultiplied(Vector4(0.f, 0.f, 0.f, 0.5f));
-				r->DrawImage(nullptr, AABB2(tpos.x, tpos.y, tsize.x, tsize.y));
-				font->DrawShadow(str, tpos + Vector2(margin, margin), 1.f, Vector4(1.f, 1.f, 1.f, a), Vector4(0.f, 0.f, 0.f, a2));
-			}
-
-			if (n_StatsColor && !Replaying){
+			if (n_StatsColor){
 			
 			//fps
 			auto fps = fpsCounter.GetFps();
