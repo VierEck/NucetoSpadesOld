@@ -108,7 +108,7 @@ DEFINE_SPADES_SETTING(cg_keySpeedUp, "Keypad 8");
 DEFINE_SPADES_SETTING(cg_keySpeedDown, "Keypad 2");
 DEFINE_SPADES_SETTING(cg_keySpeedNormalize, "Keypad 1");
 DEFINE_SPADES_SETTING(cg_SpeedChangeValue, "0.2");
-DEFINE_SPADES_SETTING(cg_DemoKeysDisableInUi, "0");
+DEFINE_SPADES_SETTING(cg_KeyProgressUi, "MiddleMouseButton");
 
 namespace spades {
 	namespace client {
@@ -126,9 +126,44 @@ namespace spades {
 				// now loading.
 				return true;
 			}
-			if (IsLimboViewActive()) {
+			if (IsLimboViewActive() || demoProgress.uiActive) {
 				return true;
 			}
+			return false;
+		}
+
+		bool DemoProgressBarHitBox(float x, float y, float w, float h) {
+			if (x >= (w * 0.25f) &&
+				x <= (w * 0.75f) &&
+				y >= (h * 0.88f - 10.f) &&
+				y <= (h * 0.88f + 28.f)
+				)
+				return true;
+			return false;
+		}
+
+		bool DemoProgressPauseHitBox(float x, float y, float w, float h) {
+			if (x >= (w * 0.25f) &&
+				x <= (w * 0.75f) &&
+				y <= (h * 0.88f - 20.f)
+				)
+				return true;
+			return false;
+		}
+
+		bool DemoProgressFastForwardHitBox(float x, float y, float w, float h) {
+			if (x > (w * 0.75f) &&
+				y <= (h * 0.88f - 20.f)
+				)
+				return true;
+			return false;
+		}
+
+		bool DemoProgressRewindHitBox(float x, float y, float w, float h) {
+			if (x < (w * 0.25f) &&
+				y <= (h * 0.88f - 20.f)
+				)
+				return true;
 			return false;
 		}
 
@@ -142,6 +177,40 @@ namespace spades {
 
 			if (IsLimboViewActive()) {
 				limbo->MouseEvent(x, y);
+				return;
+			}
+
+			if (demoProgress.uiActive) {
+				//-1 not hovering state
+				demoProgress.cursor.x = x;
+				demoProgress.cursor.y = y;
+				float w = renderer->ScreenWidth();
+				float h = renderer->ScreenHeight();
+
+				demoProgress.cursor.x = std::max(demoProgress.cursor.x, 0.f);
+				demoProgress.cursor.y = std::max(demoProgress.cursor.y, 0.f);
+				demoProgress.cursor.x = std::min(demoProgress.cursor.x, w);
+				demoProgress.cursor.y = std::min(demoProgress.cursor.y, h);
+				float startBar = w * 0.25f;
+				float halfBar = w * 0.5f;
+
+				demoProgress.skipTo = -1.f;
+				if (DemoProgressBarHitBox(x, y, w, h)) {
+
+					float multiplier = net->GetDemoEndTime() / halfBar;
+					float skipTo = (x - startBar) * multiplier;
+
+					demoProgress.skipTo = skipTo;
+				}
+				if (DemoProgressPauseHitBox(x, y, w, h)) {
+					demoProgress.skipTo = -2.f;
+				}
+				if (DemoProgressFastForwardHitBox(x, y, w, h)) {
+					demoProgress.skipTo = -3.f;
+				}
+				if (DemoProgressRewindHitBox(x, y, w, h)) {
+					demoProgress.skipTo = -4.f;
+				}
 				return;
 			}
 
@@ -302,7 +371,7 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			if (Replaying && world) {
-				if ((scriptedUI->NeedsInput() && (bool)cg_DemoKeysDisableInUi) || !(bool)cg_DemoKeysDisableInUi) {
+				if (!scriptedUI->NeedsInput()) {
 					if (CheckKey(cg_keyPause, name) && down) {
 						net->DemoPause(net->IsDemoPaused());
 						return;
@@ -335,6 +404,28 @@ namespace spades {
 						net->DemoSpeed(1.f);
 						return;
 					}
+				}
+				if (CheckKey(cg_KeyProgressUi, name) && down) {
+					demoProgress.uiActive = !demoProgress.uiActive;
+					if (demoProgress.uiActive && scriptedUI->NeedsInput()) {
+						scriptedUI->CloseUI(); //close ui
+					}
+					return;
+				}
+				if (demoProgress.uiActive && name == "LeftMouseButton" && down) {
+					if (demoProgress.skipTo >= -1.f) {
+						net->DemoSkip(demoProgress.skipTo - net->GetDemoTimer());
+					}
+					if (demoProgress.skipTo == -2.f) {
+						net->DemoPause(net->IsDemoPaused());
+					}
+					if (demoProgress.skipTo == -3.f) {
+						net->DemoSkip((float)cg_SkipValue);
+					}
+					if (demoProgress.skipTo == -4.f) {
+						net->DemoSkip((float)cg_SkipValue * (-1.f));
+					}
+					return;
 				}
 			}
 			

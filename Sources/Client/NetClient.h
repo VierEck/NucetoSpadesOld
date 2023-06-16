@@ -215,7 +215,8 @@ namespace spades {
 			void DemoPause(bool unpause = false);
 			void DemoSpeed(float speed);
 
-			int GetDemoTimer() { return (int)demo.deltaTime; }
+			float GetDemoTimer() { return demo.deltaTime; }
+			float GetDemoEndTime() { return demo.endTime; }
 			std::string GetDemoEnd() { return demo.endTimeStr; }
 
 			bool IsDemoRecording() { return demo.recording; }

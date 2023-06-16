@@ -717,19 +717,27 @@ namespace spades {
 			StandardPreferenceLayouter layouter(this, fontManager);
 			layouter.AddHeading(_Tr("Preferences", "Demo Recording"));
 			layouter.AddToggleField(_Tr("Preferences", "Enable Demo Recording"), "cg_DemoRecord");
+			layouter.AddParag(_Tr("Preferences", " "));
 			layouter.AddParag(_Tr("Preferences", "instantly ends demo if disabled while connected. however u cant start"));
 			layouter.AddParag(_Tr("Preferences", "a demo while connected as mapdata would be missing by that point. "));
+			layouter.AddParag(_Tr("Preferences", " "));
 			
-			layouter.AddToggleField(_Tr("Preferences", "Disable Shortcut Keys during UI"), "cg_DemoKeysDisableInUi");
+			layouter.AddHeading(_Tr("Preferences", "Replay Progressbar"));
+			layouter.AddToggleField(_Tr("Preferences", "Show Progressbar only in UI"), "cg_DemoProgressBarOnlyInUi");
+			layouter.AddParag(_Tr("Preferences", " "));
 			
+			layouter.AddHeading(_Tr("Preferences", "Replay Key Shortcuts"));
 			layouter.AddControl(_Tr("Preferences", "Pause"), "cg_keyPause");
+			layouter.AddParag(_Tr("Preferences", " "));
 			layouter.AddControl(_Tr("Preferences", "FastForward"), "cg_keySkipForward");
 			layouter.AddControl(_Tr("Preferences", "Rewind"), "cg_keySkipRewind");
 			layouter.AddSliderField(_Tr("Preferences", "FastForward/Rewind Time"), "cg_SkipValue", 1, 60, 1,
 				ConfigNumberFormatter(1, "sec"));
+			layouter.AddParag(_Tr("Preferences", " "));
 			
 			layouter.AddControl(_Tr("Preferences", "Next Ups"), "cg_keyNextUps");
 			layouter.AddControl(_Tr("Preferences", "Previous Ups"), "cg_keyPrevUps");
+			layouter.AddParag(_Tr("Preferences", " "));
 			
 			layouter.AddControl(_Tr("Preferences", "increase Speed"), "cg_keySpeedUp");
 			layouter.AddControl(_Tr("Preferences", "decrease Speed"), "cg_keySpeedDown");

@@ -102,6 +102,8 @@ DEFINE_SPADES_SETTING(n_TargetLinesDynamicMultiplier, "10");
 DEFINE_SPADES_SETTING(n_hitTestSize, "210");
 DEFINE_SPADES_SETTING(n_hitTestTransparency, "1");
 
+DEFINE_SPADES_SETTING(cg_DemoProgressBarOnlyInUi, "0");
+
 namespace spades {
 	namespace client {
 
@@ -965,27 +967,66 @@ namespace spades {
 			float scrHeight = renderer->ScreenHeight();
 			IFont *font = fontManager->GetGuiFont();
 			float margin = 5.f;
-			float a = 1.f;
-			float a2 = 0.5f;
-
 			IRenderer *r = renderer;
-			auto size = font->Measure(str);
-			size += Vector2(margin * 2.f, margin * 2.f);
 
-			auto pos = (Vector2(scrWidth, scrHeight) - size) * Vector2(0.5f, 1.f);
-
-			int currenttime = net->GetDemoTimer();
+			int currenttime = (int)net->GetDemoTimer();
 			int hour = (int)currenttime / 3600;
 			int min  = ((int)currenttime % 3600) / 60;
 			int sec  = (int)currenttime % 60;
 			sprintf(buf, "Demo: %02d:%02d:%02d / ", hour, min, sec);
 			str = buf + net->GetDemoEnd();
-			auto tsize = font->Measure(str);
-			tsize += Vector2(margin * 2.f, margin * 2.f);
-			auto tpos = (Vector2(scrWidth, scrHeight) - tsize) * Vector2(0.5f, 0.95f);
+			auto size = font->Measure(str);
+			size += Vector2(margin * 2.f, margin * 2.f);
+			auto tpos = (Vector2(scrWidth, scrHeight) - size) * Vector2(0.5f, 0.95f);
 			r->SetColorAlphaPremultiplied(Vector4(0.f, 0.f, 0.f, 0.5f));
-			r->DrawImage(nullptr, AABB2(tpos.x, tpos.y, tsize.x, tsize.y));
-			font->DrawShadow(str, tpos + Vector2(margin, margin), 1.f, Vector4(1.f, 1.f, 1.f, a), Vector4(0.f, 0.f, 0.f, a2));
+			r->DrawImage(nullptr, AABB2(tpos.x, tpos.y, size.x, size.y));
+			font->DrawShadow(str, tpos + Vector2(margin, margin), 1.f, Vector4(1.f, 1.f, 1.f, 1.f), Vector4(0.f, 0.f, 0.f, 0.5f));
+
+			if (!(bool)cg_DemoProgressBarOnlyInUi || ((bool)cg_DemoProgressBarOnlyInUi && demoProgress.uiActive)) {
+				float size = scrWidth * 0.5f;
+				float sizeBg = size + 12;
+				float sizeP = size * net->GetDemoTimer() / net->GetDemoEndTime();
+				Handle<IImage> img = renderer->RegisterImage("Gfx/White.tga");
+
+				//draw progressbar background
+				tpos = (Vector2(scrWidth - sizeBg, scrHeight - 4)) * Vector2(0.5f, 0.88f);
+				renderer->SetColorAlphaPremultiplied(MakeVector4(0.f, 0.f, 0.f, 0.9f));
+				renderer->DrawImage(img, AABB2(tpos.x, tpos.y, sizeBg, 18.f));
+
+				//draw progressbar
+				tpos = (Vector2(scrWidth - size, scrHeight)) * Vector2(0.5f, 0.88f);
+				renderer->SetColorAlphaPremultiplied(MakeVector4(0.f, 0.f, 1.f, 0.5f));
+				renderer->DrawImage(img, AABB2(tpos.x, tpos.y, sizeP, 10.f));
+				
+				if (demoProgress.uiActive) {
+					//draw cursor
+					Handle<IImage> cursor = renderer->RegisterImage("Gfx/Limbo/Cursor.png");
+					renderer->SetColorAlphaPremultiplied(MakeVector4(1.f, 1.f, 1.f, 1.f));
+					renderer->DrawImage(cursor, AABB2(demoProgress.cursor.x - 8, demoProgress.cursor.y - 8, 32, 32));
+
+					if (demoProgress.skipTo >= 0) {
+						//draw delta pos
+						renderer->SetColorAlphaPremultiplied(MakeVector4(0.5f, 0.5f, 1.f, 1.f));
+						renderer->DrawImage(img, AABB2(tpos.x + sizeP - 2, tpos.y - 2, 4, 14.f));
+
+						//draw hovered time
+						float hoverTime = demoProgress.skipTo;
+						sizeP = size * hoverTime / net->GetDemoEndTime();
+
+						int hour = (int)hoverTime / 3600;
+						int min  = ((int)hoverTime % 3600) / 60;
+						int sec  = (int)hoverTime % 60;
+						sprintf(buf, " %02d:%02d:%02d ", hour, min, sec);
+						str = buf;
+						auto size = font->Measure(str);
+						size += Vector2(margin * 2.f, margin * 2.f);
+						auto pos = Vector2(tpos.x + sizeP - (size.x * 0.5f), tpos.y - 8 - size.y);
+						r->SetColorAlphaPremultiplied(Vector4(0.f, 0.f, 0.f, 0.5f));
+						r->DrawImage(nullptr, AABB2(pos.x, pos.y, size.x, size.y));
+						font->DrawShadow(str, pos + Vector2(margin, margin), 1.f, Vector4(1.f, 1.f, 1.f, 1.f), Vector4(0.f, 0.f, 0.f, 0.5f));
+					}
+				}
+			}
 		}
 
 		void Client::DrawAlert() {
@@ -1155,7 +1196,9 @@ namespace spades {
 				if (!cg_hideHud) {
 					DrawAlert();
 
-					chatWindow->Draw();
+					/*if (!Replaying || (Replaying && !scriptedUI->IsDemoProgressUi())) {
+						chatWindow->Draw();
+					}*/
 					killfeedWindow->Draw();
 				}
 

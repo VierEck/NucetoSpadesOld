@@ -141,6 +141,10 @@ namespace spades {
 
 			Client::globalInstance = this; // ADDED: set global instance
 
+			if (Replaying) {
+				demoProgress.Initiate();
+			}
+
 			renderer->SetFogDistance(128.f);
 			renderer->SetFogColor(MakeVector3(.8f, 1.f, 1.f));
 

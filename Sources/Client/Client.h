@@ -381,7 +381,19 @@ namespace spades {
 			void DrawTarget();
 			void DrawStats();
 			void DrawHitTestDebugger();
+
 			void DrawDemoProgress();
+			struct {
+				bool uiActive;
+				float skipTo;
+				Vector2 cursor;
+
+				void Initiate() {
+					cursor = MakeVector2(0.f,0.f);
+					skipTo = -1.f;
+					uiActive = false; 
+				}
+			} demoProgress;
 
 			void DrawScene();
 			void AddGrenadeToScene(Grenade *);
