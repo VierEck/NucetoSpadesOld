@@ -101,13 +101,14 @@ SPADES_SETTING(cg_DemoRecord);
 DEFINE_SPADES_SETTING(cg_keyPause, "Keypad 5");
 DEFINE_SPADES_SETTING(cg_keySkipForward, "Keypad 6");
 DEFINE_SPADES_SETTING(cg_keySkipRewind, "Keypad 4");
-DEFINE_SPADES_SETTING(cg_SkipValue, "10");
+DEFINE_SPADES_SETTING(cg_SkipValue, "15");
 DEFINE_SPADES_SETTING(cg_keyNextUps, "Keypad 9");
 DEFINE_SPADES_SETTING(cg_keyPrevUps, "Keypad 7");
 DEFINE_SPADES_SETTING(cg_keySpeedUp, "Keypad 8");
 DEFINE_SPADES_SETTING(cg_keySpeedDown, "Keypad 2");
 DEFINE_SPADES_SETTING(cg_keySpeedNormalize, "Keypad 1");
 DEFINE_SPADES_SETTING(cg_SpeedChangeValue, "0.2");
+DEFINE_SPADES_SETTING(cg_DemoKeysDisableInUi, "0");
 
 namespace spades {
 	namespace client {
@@ -301,37 +302,39 @@ namespace spades {
 			SPADES_MARK_FUNCTION();
 
 			if (Replaying && world) {
-				if (CheckKey(cg_keyPause, name) && down) {
-					net->DemoPause(net->IsDemoPaused());
-					return;
-				}
-				if (CheckKey(cg_keySkipForward, name) && down) {
-					net->DemoSkip((float)cg_SkipValue);
-					return;
-				}
-				if (CheckKey(cg_keySkipRewind, name) && down) {
-					net->DemoSkip((float)cg_SkipValue * (-1.f));
-					return;
-				}
-				if (CheckKey(cg_keyNextUps, name) && down) {
-					net->DemoUps(1);
-					return;
-				}
-				if (CheckKey(cg_keyPrevUps, name) && down) {
-					net->DemoUps(-1);
-					return;
-				}
-				if (CheckKey(cg_keySpeedUp, name) && down) {
-					net->DemoSpeed(SpeedMultiplier + (float)cg_SpeedChangeValue);
-					return;
-				}
-				if (CheckKey(cg_keySpeedDown, name) && down) {
-					net->DemoSpeed(SpeedMultiplier - (float)cg_SpeedChangeValue);
-					return;
-				}
-				if (CheckKey(cg_keySpeedNormalize, name) && down) {
-					net->DemoSpeed(1.f);
-					return;
+				if ((scriptedUI->NeedsInput() && (bool)cg_DemoKeysDisableInUi) || !(bool)cg_DemoKeysDisableInUi) {
+					if (CheckKey(cg_keyPause, name) && down) {
+						net->DemoPause(net->IsDemoPaused());
+						return;
+					}
+					if (CheckKey(cg_keySkipForward, name) && down) {
+						net->DemoSkip((float)cg_SkipValue);
+						return;
+					}
+					if (CheckKey(cg_keySkipRewind, name) && down) {
+						net->DemoSkip((float)cg_SkipValue * (-1.f));
+						return;
+					}
+					if (CheckKey(cg_keyNextUps, name) && down) {
+						net->DemoUps(1);
+						return;
+					}
+					if (CheckKey(cg_keyPrevUps, name) && down) {
+						net->DemoUps(-1);
+						return;
+					}
+					if (CheckKey(cg_keySpeedUp, name) && down) {
+						net->DemoSpeed(SpeedMultiplier + (float)cg_SpeedChangeValue);
+						return;
+					}
+					if (CheckKey(cg_keySpeedDown, name) && down) {
+						net->DemoSpeed(SpeedMultiplier - (float)cg_SpeedChangeValue);
+						return;
+					}
+					if (CheckKey(cg_keySpeedNormalize, name) && down) {
+						net->DemoSpeed(1.f);
+						return;
+					}
 				}
 			}
 			
